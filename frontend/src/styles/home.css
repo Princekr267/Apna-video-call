@@ -1,0 +1,29 @@
+.navbar{
+    display: flex;
+    justify-content: space-between;
+    margin: 20px;
+}
+
+.navbar a{
+    text-decoration: none;
+    color: black;
+}
+
+.meetContainer{
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+
+}
+.left-panel h2{
+    margin: 1rem;
+}
+.meet-code{
+    display: flex;
+    margin: 1rem;
+}
+
+.right-panel img{
+    height: 300px;
+    right: 0;
+}

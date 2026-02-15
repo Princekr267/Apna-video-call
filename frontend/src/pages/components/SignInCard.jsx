@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
 import ForgotPassword from './ForgotPassword';
 import { GoogleIcon, FacebookIcon, SitemarkIcon } from './CustomIcons';
+import { AuthContext } from '../../context/AuthContext';
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -37,7 +38,42 @@ export default function SignInCard() {
   const [emailErrorMessage, setEmailErrorMessage] = React.useState('');
   const [passwordError, setPasswordError] = React.useState(false);
   const [passwordErrorMessage, setPasswordErrorMessage] = React.useState('');
+  const [fullNameError, setFullNameError] = React.useState(false);
+  const [fullNameErrorMessage, setFullNameErrorMessage] = React.useState('');
   const [open, setOpen] = React.useState(false);
+  const [formState, setFormState] = React.useState(0); // 0 for sign in, 1 for sign up
+  const [message, setMessage] = React.useState('');
+  const [error, setError] = React.useState('');
+
+  const {handleRegister, handleLogin} = React.useContext(AuthContext);
+  
+  const handleAuth = async () => {
+    try {
+      // Get values from form inputs
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      if (formState === 0) {
+        // Sign in
+        let result = await handleLogin(email, password);
+        console.log(result);
+        setMessage('Login successful!');
+      }
+      
+      if (formState === 1) {
+        // Sign up
+        const fullName = document.getElementById('fullName').value;
+        let result = await handleRegister(fullName, email, password);
+        console.log(result);
+        setMessage(result);
+        setFormState(0);
+      }
+    } catch (err) {
+      let message = err?.response?.data?.message || "An error occurred";
+      setError(message);
+      console.error(err);
+    }
+  }
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -48,15 +84,18 @@ export default function SignInCard() {
   };
 
   const handleSubmit = (event) => {
-    if (emailError || passwordError) {
-      event.preventDefault();
+    event.preventDefault();
+    
+    // Clear previous messages
+    setError('');
+    setMessage('');
+    
+    if (!validateInputs()) {
       return;
     }
-    const data = new FormData(event.currentTarget);
-    console.log({
-      email: data.get('email'),
-      password: data.get('password'),
-    });
+    
+    // Now call handleAuth
+    handleAuth();
   };
 
   const validateInputs = () => {
@@ -64,6 +103,18 @@ export default function SignInCard() {
     const password = document.getElementById('password');
 
     let isValid = true;
+
+    if (formState === 1) {
+      const fullname = document.getElementById('fullName');
+      if (!fullname || !fullname.value) {
+        setFullNameError(true);
+        setFullNameErrorMessage("Please enter your name");
+        isValid = false;
+      } else {
+        setFullNameError(false);
+        setFullNameErrorMessage('');
+      }
+    }
 
     if (!email.value || !/\S+@\S+\.\S+/.test(email.value)) {
       setEmailError(true);
@@ -88,51 +139,82 @@ export default function SignInCard() {
 
   return (
     <Card variant="outlined">
-      <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
-        <SitemarkIcon />
-      </Box>
       <Typography
         component="h1"
         variant="h4"
         sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}
       >
-        Sign in
+        {formState === 1 ? 'Sign up' : 'Sign in'}
       </Typography>
+      
+      {/* Display error/success messages */}
+      {error && (
+        <Typography color="error" sx={{ textAlign: 'center' }}>
+          {error}
+        </Typography>
+      )}
+      {message && (
+        <Typography color="success.main" sx={{ textAlign: 'center' }}>
+          {message}
+        </Typography>
+      )}
+      
       <Box
         component="form"
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit}  // Use onSubmit on the form
         noValidate
         sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 2 }}
       >
-        <FormControl>
-          <FormLabel htmlFor="email">Email</FormLabel>
-          <TextField
-            error={emailError}
-            helperText={emailErrorMessage}
-            id="email"
-            type="email"
-            name="email"
-            placeholder="your@email.com"
-            autoComplete="email"
-            autoFocus
-            required
-            fullWidth
-            variant="outlined"
-            color={emailError ? 'error' : 'primary'}
-          />
-        </FormControl>
+        <>
+          {formState === 1 && (
+            <FormControl>
+              <FormLabel htmlFor="fullName">Full Name</FormLabel>
+              <TextField
+                error={fullNameError}
+                helperText={fullNameErrorMessage}
+                id="fullName"
+                type="text"
+                name="fullName"
+                placeholder="Enter your full name"
+                autoFocus
+                required
+                fullWidth
+                variant="outlined"
+                color={fullNameError ? 'error' : 'primary'}
+              />
+            </FormControl>
+          )}
+          <FormControl>
+            <FormLabel htmlFor="email">Email</FormLabel>
+            <TextField
+              error={emailError}
+              helperText={emailErrorMessage}
+              id="email"
+              type="email"
+              name="email"
+              placeholder="your@email.com"
+              autoFocus={formState === 0}
+              required
+              fullWidth
+              variant="outlined"
+              color={emailError ? 'error' : 'primary'}
+            />
+          </FormControl>
+        </>
         <FormControl>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <FormLabel htmlFor="password">Password</FormLabel>
-            <Link
-              component="button"
-              type="button"
-              onClick={handleClickOpen}
-              variant="body2"
-              sx={{ alignSelf: 'baseline' }}
-            >
-              Forgot your password?
-            </Link>
+            {formState === 0 && (
+              <Link
+                component="button"
+                type="button"
+                onClick={handleClickOpen}
+                variant="body2"
+                sx={{ alignSelf: 'baseline' }}
+              >
+                Forgot your password?
+              </Link>
+            )}
           </Box>
           <TextField
             error={passwordError}
@@ -141,53 +223,35 @@ export default function SignInCard() {
             placeholder="••••••"
             type="password"
             id="password"
-            autoComplete="current-password"
-            autoFocus
+            autoFocus={false}
             required
             fullWidth
             variant="outlined"
             color={passwordError ? 'error' : 'primary'}
           />
         </FormControl>
-        <FormControlLabel
-          control={<Checkbox value="remember" color="primary" />}
-          label="Remember me"
-        />
         <ForgotPassword open={open} handleClose={handleClose} />
-        <Button type="submit" fullWidth variant="contained" onClick={validateInputs}>
-          Sign in
+        <Button type="submit" fullWidth variant="contained">
+          {formState === 1 ? 'Sign up' : 'Sign in'}
         </Button>
         <Typography sx={{ textAlign: 'center' }}>
-          Don&apos;t have an account?{' '}
+          {formState === 1 ? "Already have an account? " : "Don't have an account? "}
           <span>
             <Link
-              href="/material-ui/getting-started/templates/sign-in/"
+              component="button"
+              type="button"
               variant="body2"
               sx={{ alignSelf: 'center' }}
+              onClick={() => {
+                setFormState(formState === 1 ? 0 : 1);
+                setError('');
+                setMessage('');
+              }}
             >
-              Sign up
+              {formState === 1 ? 'Sign in' : 'Sign up'}
             </Link>
           </span>
         </Typography>
-      </Box>
-      <Divider>or</Divider>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={() => alert('Sign in with Google')}
-          startIcon={<GoogleIcon />}
-        >
-          Sign in with Google
-        </Button>
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={() => alert('Sign in with Facebook')}
-          startIcon={<FacebookIcon />}
-        >
-          Sign in with Facebook
-        </Button>
       </Box>
     </Card>
   );

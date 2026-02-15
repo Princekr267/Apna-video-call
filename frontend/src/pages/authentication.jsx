@@ -1,16 +1,14 @@
-
 import CssBaseline from '@mui/material/CssBaseline';
 import Stack from '@mui/material/Stack';
 import AppTheme from '../shared-theme/AppTheme.jsx';
 import ColorModeSelect from '../shared-theme/ColorModeSelect.jsx';
 import SignInCard from './components/SignInCard.jsx';
 import Content from './components/Content.jsx';
-
-let handleAuth = async () => {
-    
-}
+import { useContext } from 'react';
+import { AuthProvider } from '../context/AuthContext.jsx';
 
 export default function SignInSide(props) {
+
   return (
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />
@@ -61,7 +59,6 @@ export default function SignInSide(props) {
               m: 'auto',
             }}
           >
-            {/* <Content /> */}
             <SignInCard />
           </Stack>
         </Stack>

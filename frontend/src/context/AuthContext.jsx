@@ -6,13 +6,15 @@ import httpStatus from 'http-status';
 export const AuthContext = createContext({});
 
 const client = axios.create({
-    baseURL: "localhost:8080/api/v1/users"
+    baseURL: "http://localhost:3000/api/v1/users"
 })
 
 export const AuthProvider = ({children}) => {
     const authContext = useContext(AuthContext);
 
     const [userData, setUserData] = useState(authContext);
+
+    const router = useNavigate();
 
     const handleRegister  = async (name, username, password) => {
         try{
@@ -37,16 +39,41 @@ export const AuthProvider = ({children}) => {
             });
             if(request.status === httpStatus.OK){
                 localStorage.setItem("token", request.data.token);
+                router("/home");
             }
         } catch (err) {
             throw err;
         }
     }
 
-    const router = useNavigate();
+    const getHistoryOfUser = async() => {
+        try{
+            let request = await client.get("/get_all_activity", {
+                params: {
+                    token: localStorage.getItem("token")
+                }
+            });
+            return request.data;
+        } catch (err){
+            throw err;
+        }
+    }
+
+    const addToUserHistory = async(meetingCode) => {
+        try { 
+            let request = await client.post("/add_to_activity", {
+                token: localStorage.getItem("token"),
+                meetingCode: meetingCode
+            });
+            return request
+
+        } catch(e){
+            throw e;
+        }
+    }
 
     const data = {
-        userData, setUserData, handleRegister
+        userData, setUserData, getHistoryOfUser, handleRegister, handleLogin, addToUserHistory
     }
     return (
         <AuthContext.Provider value={data}>
