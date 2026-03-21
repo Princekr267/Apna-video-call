@@ -43,11 +43,11 @@ function LandingPage() {
                 {!token ? <div className="navList">
                     <p onClick={handleGuestJoin}>Join as guest</p>
                     <p onClick={() => {
-                        router("/auth")
+                        router("/auth?mode=register")
                     }}>Register</p>
                     <div role='button'>
                         <p onClick={() => {
-                            router("/auth")
+                            router("/auth?mode=login")
                         }}>Login</p>
                     </div>
                 </div> : <div style={{display: "flex", alignItems: "center", gap: "10px"}}>
