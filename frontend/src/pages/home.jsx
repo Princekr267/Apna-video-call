@@ -24,15 +24,15 @@ const generateMeetingCode = () => {
 
 function HomeComponent() {
 
-    const navigate             = useNavigate();
+    const navigate = useNavigate();
     const { addToUserHistory } = useContext(AuthContext);
 
     const [meetingCode,      setMeetingCode]      = useState('');
     const [meetingCodeError, setMeetingCodeError] = useState('');
 
     const validateCode = (code) => {
-        if (!code.trim())                    return 'Please enter a meeting code.';
-        if (!MEETING_CODE_REGEX.test(code))  return `Code must be exactly ${MEETING_CODE_LENGTH} lowercase letters/numbers (e.g. abc1234567).`;
+        if (!code.trim()) return 'Please enter a meeting code.';
+        if (!MEETING_CODE_REGEX.test(code)) return `Code must be exactly ${MEETING_CODE_LENGTH} lowercase letters/numbers (e.g. abc1234567).`;
         return '';
     };
 

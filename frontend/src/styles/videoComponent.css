@@ -204,6 +204,49 @@
     left: 20px;
 }
 
+.video-status-indicators {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    right: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    z-index: 5;
+}
+
+.video-status-indicators .video-name {
+    position: static;
+    margin: 0;
+}
+
+.media-status-icons {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.status-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    backdrop-filter: blur(8px);
+}
+
+.status-icon.muted {
+    background: rgba(255, 60, 60, 0.7);
+    color: white;
+}
+
+.status-icon.video-off {
+    background: rgba(255, 152, 57, 0.7);
+    color: white;
+}
+
 /* Beautiful Floating Control Panel */
 .buttonContainers {
     position: absolute;
@@ -435,6 +478,105 @@
     font-size: 0.85em;
 }
 
+/* File Message Styles */
+.msg-box.file-msg {
+    max-width: 90%;
+    min-width: 280px;
+}
+
+.file-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.file-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.file-details {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.file-name {
+    margin: 0;
+    font-weight: 600;
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-size {
+    margin: 0;
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.file-download-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.file-download-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.1);
+}
+
+.file-download-btn:active {
+    transform: scale(0.95);
+}
+
+.file-preview-img {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: 12px;
+    margin-top: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.msg-box.own .file-download-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.msg-box.own .file-download-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+
 /* Chat Input Area */
 .chattingArea {
     position: absolute;
@@ -442,46 +584,165 @@
     left: 25px;
     right: 25px;
     display: flex;
-    gap: 12px;
-    background: rgba(0,0,0,0.2);
-    padding: 8px;
+    align-items: center;
+    gap: 8px;
+    background: rgba(15, 20, 35, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 8px 10px;
     border-radius: 30px;
-    border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
-.chattingArea input {
+.chattingArea:hover {
+    border-color: rgba(255,255,255,0.25);
+    background: rgba(20, 25, 40, 0.9);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.chattingArea:focus-within {
+    border-color: rgba(0, 136, 255, 0.5);
+    background: rgba(20, 25, 40, 0.95);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5), 0 0 0 2px rgba(0, 136, 255, 0.2);
+}
+
+.chat-input-wrapper {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.chattingArea input[type="text"] {
+    flex: 1;
+    min-width: 0;
     background: transparent;
     border: none;
     color: white;
-    padding: 10px 15px;
+    padding: 10px 8px;
     outline: none;
     font-size: 0.95rem;
     font-family: inherit;
-}
-.chattingArea input::placeholder {
-    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.2px;
+    box-sizing: border-box;
 }
 
-.chattingArea button {
-    background: var(--accent-gradient);
+.file-preview-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 136, 255, 0.15);
+    border: 1px solid rgba(0, 136, 255, 0.3);
+    border-radius: 20px;
+    padding: 6px 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.file-chip-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.file-chip-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.file-chip-size {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+
+.file-chip-clear {
+    background: rgba(255, 255, 255, 0.15);
     border: none;
     color: white;
     border-radius: 50%;
-    width: 42px;
-    height: 42px;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.file-chip-clear:hover {
+    background: rgba(255, 60, 60, 0.3);
+    transform: scale(1.1);
+}
+.chattingArea input[type="text"]::placeholder {
+    color: rgba(255,255,255,0.45);
+    font-weight: 400;
+    font-size: 0.9rem;
+}
+
+.chattingArea button {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
     cursor: pointer;
     display: flex;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 4px 15px rgba(0, 136, 255, 0.4);
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
+    position: relative;
+    padding: 0;
+    box-sizing: border-box;
 }
+
 .chattingArea button:hover {
-    transform: scale(1.1) rotate(-10deg);
-    box-shadow: 0 6px 20px rgba(0, 136, 255, 0.6);
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.05);
+}
+
+.chattingArea button:active {
+    transform: scale(0.95);
+}
+
+.chattingArea button:last-child {
+    background: var(--accent-gradient);
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 136, 255, 0.3);
+}
+
+.chattingArea button:last-child:hover {
+    transform: scale(1.05) rotate(-5deg);
+    box-shadow: 0 6px 16px rgba(0, 136, 255, 0.5);
+    background: linear-gradient(135deg, #0099ff, #00e5cc);
+}
+
+.chattingArea button:last-child:active {
+    transform: scale(0.95) rotate(-5deg);
+}
+
+.chattingArea button svg {
+    font-size: 1.1rem;
+    display: block;
 }
 
 /* Participants Panel */
@@ -518,6 +779,8 @@
 .userInfo {
     display: flex;
     flex-direction: column;
+    gap: 4px;
+    flex: 1;
 }
 .userName {
     font-size: 1rem;
@@ -527,6 +790,15 @@
 .youBadge {
     color: var(--accent-primary);
     font-size: 0.8rem;
+}
+.user-media-status {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.user-media-status .status-icon {
+    padding: 3px 6px;
+    font-size: 0.75rem;
 }
 .userStatus {
     font-size: 0.8rem;
@@ -588,6 +860,21 @@
     text-align: center;
 }
 
+.lobby-media-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lobby-media-controls .MuiIconButton-root {
+    width: 50px;
+    height: 50px;
+}
+
 .lobbyPreview {
     z-index: 2;
     border-radius: 24px;
@@ -597,6 +884,14 @@
     border: none;
     animation: fadeScale 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     background: #000;
+}
+
+.lobbyVideoOff {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 450px;
+    background: radial-gradient(circle, rgba(30,40,65,1) 0%, rgba(10,15,30,1) 100%);
 }
 
 @keyframes fadeScale {
@@ -661,6 +956,29 @@
     top: auto;
     bottom: 110px;
   }
+  .chattingArea {
+    left: 15px;
+    right: 15px;
+    bottom: 20px;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .chattingArea button {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+  .chattingArea button svg {
+    font-size: 0.95rem;
+  }
+  .chattingArea input {
+    padding: 8px 6px;
+    font-size: 0.85rem;
+  }
+  .chattingArea input::placeholder {
+    font-size: 0.8rem;
+  }
   .meetUserVideo {
       height: 120px;
       bottom: 140px;
@@ -675,4 +993,203 @@
   .localVideoAvatar span {
       font-size: 2.5rem;
   }
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/* ── Host Features ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+/* Host Badge - Gold star on avatar */
+.hostBadge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: linear-gradient(135deg, #ffd700, #ffb700);
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(15, 23, 42, 0.9);
+    color: #000;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+}
+
+/* Host Label text */
+.hostLabel {
+    color: #ffd700;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Room Locked Banner */
+.room-locked-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 15px;
+    background: rgba(255, 71, 87, 0.15);
+    border: 1px solid rgba(255, 71, 87, 0.3);
+    border-radius: 12px;
+    margin: 10px 15px;
+    color: #ff4757;
+    font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+/* Host Controls Container */
+.hostControls {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.userItem:hover .hostControls {
+    opacity: 1;
+}
+
+/* Confirm Dialog - Full screen overlay */
+.confirmDialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(5px);
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Dialog Content Card */
+.confirmDialogContent {
+    background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 23, 42, 0.95));
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 71, 87, 0.2);
+    max-width: 400px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.confirmDialogContent h3 {
+    margin: 0 0 12px 0;
+    color: #fff;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.confirmDialogContent p {
+    margin: 0 0 24px 0;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+/* Dialog Action Buttons */
+.confirmDialogActions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.confirmDialogActions button {
+    padding: 10px 20px;
+    font-weight: 600;
+    text-transform: none;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+
+/* Ensure userAvatar is positioned relatively for badge */
+.userAvatar {
+    position: relative;
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/* ── Flash Notifications ──────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+.flash-notification {
+    position: fixed;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    z-index: 10001;
+    animation: slideDownNotif 0.3s ease, fadeOutNotif 0.3s ease 2.7s forwards;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    max-width: 90vw;
+    text-align: center;
+}
+
+.flash-notification.info {
+    background: rgba(0, 136, 255, 0.9);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.flash-notification.warning {
+    background: rgba(255, 152, 0, 0.9);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.flash-notification.error {
+    background: rgba(255, 71, 87, 0.9);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.flash-notification.success {
+    background: rgba(76, 209, 55, 0.9);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes slideDownNotif {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes fadeOutNotif {
+    from { opacity: 1; }
+    to { opacity: 0; }
 }

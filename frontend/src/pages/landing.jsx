@@ -4,6 +4,18 @@ import { IconButton, Button } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
 import PersonIcon from '@mui/icons-material/Person';
 
+// Meeting codes: exactly 10 lowercase alphanumeric characters
+const MEETING_CODE_LENGTH = 10;
+
+const generateMeetingCode = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let code = '';
+    for (let i = 0; i < MEETING_CODE_LENGTH; i++) {
+        code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+};
+
 function LandingPage() {
     const router = useNavigate();
     const token = localStorage.getItem("token");
@@ -14,7 +26,14 @@ function LandingPage() {
             router("/auth");
         }
     }
-     let navigate = useNavigate();
+
+    const handleGuestJoin = () => {
+        // Generate a unique meeting code for the guest
+        const code = generateMeetingCode();
+        router(`/${code}`);
+    };
+
+    let navigate = useNavigate();
     return ( 
         <div className='landingPageContainer'>
             <nav>
@@ -22,9 +41,7 @@ function LandingPage() {
                     <h2>ConferenceWorld</h2>
                 </div>
                 {!token ? <div className="navList">
-                    <p onClick={() => {
-                        router("/guest_join")
-                    }}>Join as guest</p>
+                    <p onClick={handleGuestJoin}>Join as guest</p>
                     <p onClick={() => {
                         router("/auth")
                     }}>Register</p>

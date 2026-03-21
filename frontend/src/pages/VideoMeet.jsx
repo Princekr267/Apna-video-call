@@ -17,8 +17,14 @@ import SendIcon from '@mui/icons-material/Send';
 import Badge from '@mui/material/Badge';
 import DownloadIcon from '@mui/icons-material/Download';
 import PeopleIcon from '@mui/icons-material/People';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import LockIcon from '@mui/icons-material/Lock';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
+import StarIcon from '@mui/icons-material/Star';
+import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import { GoogleGenAI } from "@google/genai";
 import { AuthContext } from '../context/AuthContext';
+
 
 const SERVER_URL = "http://localhost:3000";
 const AI_SENDER  = "🤖 AI Assistant";
@@ -33,7 +39,7 @@ const peerConfig = {
 // ─────────────────────────────────────────────────────────────────────────────
 // VideoTile — a single remote participant tile with reactive camera-off state
 // ─────────────────────────────────────────────────────────────────────────────
-const VideoTile = React.memo(({ stream, socketId, username }) => {
+const VideoTile = React.memo(({ stream, socketId, username, mediaState }) => {
     const videoRef = useRef();
     const initial  = (username || '?')[0].toUpperCase();
 
@@ -62,24 +68,44 @@ const VideoTile = React.memo(({ stream, socketId, username }) => {
         };
     }, [stream]);
 
+    // Use media state from props if available
+    const videoOn = mediaState?.video !== undefined ? mediaState.video : hasVideo;
+    const audioOn = mediaState?.audio !== undefined ? mediaState.audio : true;
+
     return (
-        <div className={`video-card ${!hasVideo ? 'video-card--off' : ''}`}>
+        <div className={`video-card ${!videoOn ? 'video-card--off' : ''}`}>
             <video
                 data-socket={socketId}
                 ref={videoRef}
                 autoPlay
-                className={hasVideo ? '' : 'video-hidden'}
+                className={videoOn ? '' : 'video-hidden'}
             />
-            {!hasVideo && (
+            {!videoOn && (
                 <div className="video-avatar-placeholder">
                     <div className="video-avatar-ring">
                         <span className="video-avatar-initial">{initial}</span>
                     </div>
                     <span className="video-avatar-name">{username || 'User'}</span>
-                    <span className="video-cam-off-label">📷 Camera off</span>
+                    <span className="video-cam-off-label">
+                        <VideocamOffIcon sx={{ fontSize: '1rem' }} /> Camera off
+                    </span>
                 </div>
             )}
-            {hasVideo && <span className="video-name name-bottom">{username}</span>}
+            <div className="video-status-indicators">
+                <span className="video-name">{username}</span>
+                <div className="media-status-icons">
+                    {!audioOn && (
+                        <span className="status-icon muted" title="Microphone muted">
+                            <MicOffIcon sx={{ fontSize: '1rem' }} />
+                        </span>
+                    )}
+                    {!videoOn && (
+                        <span className="status-icon video-off" title="Camera off">
+                            <VideocamOffIcon sx={{ fontSize: '1rem' }} />
+                        </span>
+                    )}
+                </div>
+            </div>
         </div>
     );
 });
@@ -118,6 +144,7 @@ export default function VideoMeetComponent() {
     const localVideoRef   = useRef();
     const videoListRef    = useRef([]);
     const messagesEndRef  = useRef();
+    const fileInputRef    = useRef();
 
     // Device availability
     let [videoAvailable, setVideoAvailable] = useState(true);
@@ -129,6 +156,10 @@ export default function VideoMeetComponent() {
     let [audio,  setAudio]  = useState();
     let [screen, setScreen] = useState();
 
+    // Refs to track current media state for socket handlers (avoids stale closures)
+    const videoStateRef = useRef(video);
+    const audioStateRef = useRef(audio);
+
     // UI panels
     let [showModal,      setModal]      = useState(false);
     let [showUsersPanel, setShowUsersPanel] = useState(false);
@@ -137,15 +168,33 @@ export default function VideoMeetComponent() {
     let [messages,    setMessages]    = useState([]);
     let [message,     setMessage]     = useState('');
     let [newMessages, setNewMessages] = useState(0);
+    let [selectedFile, setSelectedFile] = useState(null);
 
     // Lobby / user identity
     let [askForUsername, setAskForUsername] = useState(true);
     let [username,       setUsername]       = useState('');
     let [usernameError,  setUsernameError]  = useState(false);
 
+    // Lobby media controls (refs keep async getPermissions in sync)
+    let [lobbyVideo, setLobbyVideo] = useState(true);
+    let [lobbyAudio, setLobbyAudio] = useState(true);
+    const lobbyVideoRef = useRef(true);
+    const lobbyAudioRef = useRef(true);
+
     // Participants
     const [socketToUsername, setSocketToUsername] = useState({});
     const [connectedUsers,   setConnectedUsers]   = useState([]);
+    const [participantMediaState, setParticipantMediaState] = useState({});
+
+    // Host features
+    const [hostSocketId, setHostSocketId] = useState(null);
+    const [isHost, setIsHost] = useState(false);
+    const [isRoomLocked, setIsRoomLocked] = useState(false);
+    const [showKickConfirm, setShowKickConfirm] = useState(null);
+    const [showTransferConfirm, setShowTransferConfirm] = useState(null);
+
+    // Flash notifications
+    const [notification, setNotification] = useState(null);
 
     // Remote video streams
     let [videos, setVideos] = useState([]);
@@ -164,11 +213,14 @@ export default function VideoMeetComponent() {
             setScreenAvailable(!!navigator.mediaDevices.getDisplayMedia);
 
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: videoAvailable,
-                audio: audioAvailable,
+                video: true,
+                audio: true,
             });
             if (stream) {
                 window.localStream = stream;
+                // Honour lobby toggles the user may have clicked while we were loading
+                if (!lobbyVideoRef.current) stream.getVideoTracks().forEach(t => t.stop());
+                if (!lobbyAudioRef.current) stream.getAudioTracks().forEach(t => t.stop());
                 if (localVideoRef.current) localVideoRef.current.srcObject = stream;
             }
         } catch (err) {
@@ -177,6 +229,12 @@ export default function VideoMeetComponent() {
     };
 
     useEffect(() => { getPermissions(); }, []);
+
+    // Keep refs in sync with media state (for socket handlers)
+    useEffect(() => {
+        videoStateRef.current = video;
+        audioStateRef.current = audio;
+    }, [video, audio]);
 
     useEffect(() => {
         getUserProfile()
@@ -319,24 +377,113 @@ export default function VideoMeetComponent() {
     };
 
     // ── Chat ────────────────────────────────────────────────────────────────
-    const addMessage = (data, sender, senderSocketId) => {
-        setMessages(prev => [...prev, { sender, data }]);
+    const addMessage = (data, sender, senderSocketId, type = 'text') => {
+        setMessages(prev => [...prev, { sender, data, type }]);
         if (senderSocketId !== socketIdRef.current) {
             setNewMessages(prev => prev + 1);
         }
     };
 
+    const handleFileSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file size (5MB limit)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            alert('File size must be less than 5MB');
+            e.target.value = '';
+            return;
+        }
+
+        // Store file for preview, don't send yet
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setSelectedFile({
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                data: event.target.result
+            });
+        };
+        reader.readAsDataURL(file);
+        
+        // Reset file input
+        e.target.value = '';
+    };
+
+    const clearSelectedFile = () => {
+        setSelectedFile(null);
+    };
+
+    const sendFile = () => {
+        if (selectedFile) {
+            socketRef.current.emit('file-message', selectedFile, username);
+            setSelectedFile(null);
+        }
+    };
+
+    const downloadFile = (fileData) => {
+        const link = document.createElement('a');
+        link.href = fileData.data;
+        link.download = fileData.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const formatFileSize = (bytes) => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    const getFileIcon = (type) => {
+        if (type.startsWith('image/')) return '🖼️';
+        if (type.startsWith('video/')) return '🎥';
+        if (type.startsWith('audio/')) return '🎵';
+        if (type.includes('pdf')) return '📄';
+        if (type.includes('word') || type.includes('document')) return '📝';
+        if (type.includes('sheet') || type.includes('excel')) return '📊';
+        if (type.includes('zip') || type.includes('rar')) return '📦';
+        return '📎';
+    };
+
     const sendMessage = () => {
+        // Send file if selected
+        if (selectedFile) {
+            sendFile();
+            return;
+        }
+        
+        // Send text message
         if (!message.trim()) return;
-        // Always emit through socket so ALL users see every message (including @ai questions)
         socketRef.current.emit('chat-message', message, username);
         if (message.toLowerCase().startsWith('@ai')) askAI(message);
         setMessage('');
     };
 
     const askAI = async (userMessage) => {
-        const ai     = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_GEMINI_API_KEY });
-        const prompt = userMessage.replace(/@ai/i, '').trim();
+        const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_GEMINI_API_KEY });
+
+        // Detect "@ai from chat <question>" — includes full chat history as context
+        const fromChatMatch = userMessage.match(/@ai\s+from\s+chat\s+(.+)/i);
+        let prompt;
+
+        if (fromChatMatch) {
+            const question = fromChatMatch[1].trim();
+            const transcript = messages
+                .filter(m => m.type === 'text' && m.sender !== AI_SENDER)
+                .map(m => `[${m.sender}]: ${m.data}`)
+                .join('\n');
+            prompt = transcript
+                ? `You are an AI assistant in a video meeting. Below is the full chat transcript so far — use it as context to answer the question.\n\nChat transcript:\n${transcript}\n\nUser's question: ${question}`
+                : question;
+        } else {
+            // Plain "@ai <question>" — no chat context
+            prompt = userMessage.replace(/@ai/i, '').trim();
+        }
+
         try {
             const response = await ai.models.generateContent({
                 model: 'gemini-3.1-flash-lite-preview',
@@ -371,6 +518,13 @@ export default function VideoMeetComponent() {
     };
 
     // ── Socket connection ───────────────────────────────────────────────────
+
+    // Show flash notification
+    const showNotification = (message, type = 'info') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 3000);
+    };
+
     const connectToSocketServer = () => {
         socketRef.current = io.connect(SERVER_URL, { secure: false });
         socketRef.current.on('signal', gotMessageFromServer);
@@ -380,9 +534,30 @@ export default function VideoMeetComponent() {
             socketRef.current.emit('set-username', username);
             socketIdRef.current = socketRef.current.id;
 
+            // Broadcast initial media state so others know our audio/video status
+            setTimeout(() => {
+                if (socketRef.current) {
+                    socketRef.current.emit('media-state-change', {
+                        video: videoStateRef.current,
+                        audio: audioStateRef.current
+                    });
+                }
+            }, 500);
+
             setConnectedUsers([{ socketId: socketRef.current.id, name: username }]);
 
             socketRef.current.on('chat-message', addMessage);
+
+            socketRef.current.on('file-message', (fileData, sender, socketIdSender) => {
+                addMessage(fileData, sender, socketIdSender, 'file');
+            });
+
+            socketRef.current.on('media-state-change', (socketId, mediaState) => {
+                setParticipantMediaState(prev => ({
+                    ...prev,
+                    [socketId]: mediaState
+                }));
+            });
 
             socketRef.current.on('user-username', (socketId, uname) => {
                 setSocketToUsername(prev => ({ ...prev, [socketId]: uname }));
@@ -457,6 +632,61 @@ export default function VideoMeetComponent() {
                     }
                 }
             });
+
+            // ── Host Feature Events ─────────────────────────────────────────
+
+            socketRef.current.on('room-host-info', ({ hostId, isLocked }) => {
+                setHostSocketId(hostId);
+                setIsHost(hostId === socketRef.current.id);
+                setIsRoomLocked(isLocked);
+            });
+
+            socketRef.current.on('force-muted', () => {
+                setAudio(false);
+                if (socketRef.current) {
+                    socketRef.current.emit('media-state-change', {
+                        video: videoStateRef.current,
+                        audio: false
+                    });
+                }
+                showNotification('The host has muted your microphone', 'warning');
+            });
+
+            socketRef.current.on('force-video-off', () => {
+                setVideo(false);
+                if (socketRef.current) {
+                    socketRef.current.emit('media-state-change', {
+                        video: false,
+                        audio: audioStateRef.current
+                    });
+                }
+                showNotification('The host has turned off your camera', 'warning');
+            });
+
+            socketRef.current.on('kicked-from-room', ({ reason }) => {
+                showNotification('You have been removed from the meeting by the host', 'error');
+                setTimeout(() => handleEndCall(), 2000);
+            });
+
+            socketRef.current.on('join-rejected', ({ reason }) => {
+                if (reason === 'room_locked') {
+                    showNotification('This meeting room is locked and not accepting new participants', 'error');
+                    setTimeout(() => navigate('/'), 2000);
+                }
+            });
+
+            socketRef.current.on('room-lock-changed', ({ isLocked, hostId }) => {
+                setIsRoomLocked(isLocked);
+            });
+
+            socketRef.current.on('host-changed', ({ newHostId, oldHostId }) => {
+                setHostSocketId(newHostId);
+                setIsHost(newHostId === socketRef.current.id);
+
+                if (newHostId === socketRef.current.id) {
+                    showNotification('You are now the host of this meeting', 'success');
+                }
+            });
         });
     };
 
@@ -465,8 +695,14 @@ export default function VideoMeetComponent() {
         if (!username.trim()) { setUsernameError(true); return; }
         setUsernameError(false);
         setAskForUsername(false);
-        setVideo(videoAvailable);
-        setAudio(audioAvailable);
+        // Carry lobby toggle states into the call
+        const initialVideo = videoAvailable && lobbyVideo;
+        const initialAudio = audioAvailable && lobbyAudio;
+        setVideo(initialVideo);
+        setAudio(initialAudio);
+        // Update refs immediately so they're available for socket handlers
+        videoStateRef.current = initialVideo;
+        audioStateRef.current = initialAudio;
         connectToSocketServer();
     };
 
@@ -474,6 +710,52 @@ export default function VideoMeetComponent() {
         try { localVideoRef.current.srcObject?.getTracks().forEach(t => t.stop()); } catch (_) {}
         navigate('/');
     };
+
+    // ── Host Controls ───────────────────────────────────────────────────────
+
+    const handleMuteUser = (targetSocketId) => {
+        const roomPath = window.location.href;
+        socketRef.current.emit('host-force-mute-user', {
+            targetSocketId,
+            roomPath
+        });
+    };
+
+    const handleVideoOffUser = (targetSocketId) => {
+        const roomPath = window.location.href;
+        socketRef.current.emit('host-force-video-off', {
+            targetSocketId,
+            roomPath
+        });
+    };
+
+    const handleKickUser = (targetSocketId) => {
+        const roomPath = window.location.href;
+        socketRef.current.emit('host-kick-user', {
+            targetSocketId,
+            roomPath
+        });
+        setShowKickConfirm(null);
+    };
+
+    const handleToggleRoomLock = () => {
+        const roomPath = window.location.href;
+        socketRef.current.emit('host-toggle-room-lock', {
+            roomPath,
+            locked: !isRoomLocked
+        });
+    };
+
+    const handleTransferHost = (targetSocketId) => {
+        const roomPath = window.location.href;
+        socketRef.current.emit('host-transfer-host', {
+            targetSocketId,
+            roomPath
+        });
+        setShowTransferConfirm(null);
+    };
+
+    // ────────────────────────────────────────────────────────────────────────
 
     const handleChatToggle = () => {
         if (!showModal) { setShowUsersPanel(false); setNewMessages(0); }
@@ -515,6 +797,68 @@ export default function VideoMeetComponent() {
                         sx={textFieldSx}
                     />
 
+                    <div className="lobby-media-controls">
+                        <IconButton
+                            onClick={() => {
+                                const newState = !lobbyVideo;
+                                setLobbyVideo(newState);
+                                lobbyVideoRef.current = newState; // keep ref in sync
+                                if (!newState) {
+                                    // Stop tracks → releases camera hardware (turns off camera light)
+                                    window.localStream?.getVideoTracks().forEach(t => t.stop());
+                                } else {
+                                    // Re-acquire camera
+                                    navigator.mediaDevices.getUserMedia({ video: true })
+                                        .then(stream => {
+                                            const track = stream.getVideoTracks()[0];
+                                            if (!track) return;
+                                            if (window.localStream) {
+                                                window.localStream.getVideoTracks().forEach(t => window.localStream.removeTrack(t));
+                                                window.localStream.addTrack(track);
+                                            } else {
+                                                window.localStream = stream;
+                                            }
+                                            if (localVideoRef.current) localVideoRef.current.srcObject = window.localStream;
+                                        })
+                                        .catch(console.error);
+                                }
+                            }}
+                            className={lobbyVideo ? 'activeIcon' : 'inactiveIcon'}
+                            title={lobbyVideo ? 'Turn off camera' : 'Turn on camera'}
+                        >
+                            {lobbyVideo ? <VideocamIcon /> : <VideocamOffIcon />}
+                        </IconButton>
+                        <IconButton
+                            onClick={() => {
+                                const newState = !lobbyAudio;
+                                setLobbyAudio(newState);
+                                lobbyAudioRef.current = newState; // keep ref in sync
+                                if (!newState) {
+                                    // Stop tracks → releases microphone hardware
+                                    window.localStream?.getAudioTracks().forEach(t => t.stop());
+                                } else {
+                                    // Re-acquire mic
+                                    navigator.mediaDevices.getUserMedia({ audio: true })
+                                        .then(stream => {
+                                            const track = stream.getAudioTracks()[0];
+                                            if (!track) return;
+                                            if (window.localStream) {
+                                                window.localStream.getAudioTracks().forEach(t => window.localStream.removeTrack(t));
+                                                window.localStream.addTrack(track);
+                                            } else {
+                                                window.localStream = stream;
+                                            }
+                                        })
+                                        .catch(console.error);
+                                }
+                            }}
+                            className={lobbyAudio ? 'activeIcon' : 'inactiveIcon'}
+                            title={lobbyAudio ? 'Mute' : 'Unmute'}
+                        >
+                            {lobbyAudio ? <MicIcon /> : <MicOffIcon />}
+                        </IconButton>
+                    </div>
+
                     <Button
                         variant="contained"
                         onClick={connect}
@@ -554,7 +898,22 @@ export default function VideoMeetComponent() {
                     </Button>
                 </div>
 
-                <video ref={localVideoRef} autoPlay muted className="lobbyPreview" />
+                {lobbyVideo ? (
+                    <video ref={localVideoRef} autoPlay muted className="lobbyPreview" />
+                ) : (
+                    <div className="lobbyPreview lobbyVideoOff">
+                        <div className="video-avatar-placeholder">
+                            <div className="video-avatar-ring">
+                                <span className="video-avatar-initial">{(username || '?')[0].toUpperCase()}</span>
+                            </div>
+                            <p className="video-avatar-name">{username || 'You'}</p>
+                            <span className="video-cam-off-label">
+                                <VideocamOffIcon sx={{ fontSize: '1rem' }} />
+                                Camera Off
+                            </span>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -582,12 +941,47 @@ export default function VideoMeetComponent() {
                             {messages.length === 0 && (
                                 <div className="chat-empty-state">
                                     <span>💬</span>
-                                    <p>No messages yet.<br />Type <strong>@ai</strong> to ask the AI assistant!</p>
+                                    <p>No messages yet.<br />Type <strong>@ai</strong> to ask the AI, or <strong>@ai from chat</strong> to ask with full chat context!</p>
                                 </div>
                             )}
                             {messages.map((item, index) => {
                                 const isAI  = item.sender === AI_SENDER;
                                 const isOwn = item.sender === username;
+                                
+                                if (item.type === 'file') {
+                                    return (
+                                        <div
+                                            className={`msg-box file-msg ${isOwn ? 'own' : 'other'}`}
+                                            key={index}
+                                        >
+                                            <span>{item.sender}</span>
+                                            <div className="file-content">
+                                                <div className="file-info">
+                                                    <span className="file-icon">{getFileIcon(item.data.type)}</span>
+                                                    <div className="file-details">
+                                                        <p className="file-name">{item.data.name}</p>
+                                                        <p className="file-size">{formatFileSize(item.data.size)}</p>
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    className="file-download-btn"
+                                                    onClick={() => downloadFile(item.data)}
+                                                    title="Download file"
+                                                >
+                                                    <DownloadIcon sx={{ fontSize: '1.2rem' }} />
+                                                </button>
+                                            </div>
+                                            {item.data.type.startsWith('image/') && (
+                                                <img 
+                                                    src={item.data.data} 
+                                                    alt={item.data.name}
+                                                    className="file-preview-img"
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                }
+                                
                                 return (
                                     <div
                                         className={`msg-box ${isOwn ? 'own' : isAI ? 'ai' : 'other'}`}
@@ -604,11 +998,40 @@ export default function VideoMeetComponent() {
 
                     <div className="chattingArea">
                         <input
-                            value={message}
-                            onChange={e => setMessage(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') sendMessage(); }}
-                            placeholder="Message or @ai <question>"
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                            style={{ display: 'none' }}
                         />
+                        {!selectedFile && (
+                            <button onClick={() => fileInputRef.current?.click()}>
+                                <AttachFileIcon/>
+                            </button>
+                        )}
+                        <div className="chat-input-wrapper">
+                            {selectedFile ? (
+                                <div className="file-preview-chip">
+                                    <span className="file-chip-icon">{getFileIcon(selectedFile.type)}</span>
+                                    <span className="file-chip-name">{selectedFile.name}</span>
+                                    <span className="file-chip-size">({formatFileSize(selectedFile.size)})</span>
+                                    <button 
+                                        className="file-chip-clear"
+                                        onClick={clearSelectedFile}
+                                        title="Remove file"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={message}
+                                    onChange={e => setMessage(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') sendMessage(); }}
+                                    placeholder="Message · @ai <question> · @ai from chat <question>"
+                                />
+                            )}
+                        </div>
                         <button onClick={sendMessage}><SendIcon sx={{ fontSize: '1.2rem' }} /></button>
                     </div>
                 </div>
@@ -619,24 +1042,211 @@ export default function VideoMeetComponent() {
                 <div className="usersPanel">
                     <div className="chatHeader">
                         <h1>Participants ({connectedUsers.length})</h1>
+                        {isHost && (
+                            <IconButton
+                                onClick={handleToggleRoomLock}
+                                title={isRoomLocked ? "Unlock room" : "Lock room"}
+                                size="small"
+                                sx={{
+                                    color: isRoomLocked ? '#ff4757' : 'rgba(255, 255, 255, 0.6)',
+                                    '&:hover': { color: '#fff' }
+                                }}
+                            >
+                                {isRoomLocked ? <LockIcon /> : <LockOpenIcon />}
+                            </IconButton>
+                        )}
                     </div>
+
+                    {isRoomLocked && (
+                        <div className="room-locked-banner">
+                            <LockIcon sx={{ fontSize: '1rem' }} />
+                            <span>Room is locked - No new participants can join</span>
+                        </div>
+                    )}
+
                     <div className="usersList">
-                        {connectedUsers.map((user) => (
-                            <div className="userItem" key={user.socketId}>
-                                <div className="userAvatar">
-                                    {(user.name || 'U')[0].toUpperCase()}
-                                </div>
-                                <div className="userInfo">
-                                    <span className="userName">
-                                        {user.name || 'Unknown'}
-                                        {user.socketId === socketIdRef.current && (
-                                            <span className="youBadge"> (You)</span>
+                        {connectedUsers.map((user) => {
+                            const userMediaState = participantMediaState[user.socketId];
+                            const isCurrentUser = user.socketId === socketIdRef.current;
+                            const isUserHost = user.socketId === hostSocketId;
+                            const videoOn = isCurrentUser ? video : (userMediaState?.video === true);
+                            const audioOn = isCurrentUser ? audio : (userMediaState?.audio === true);
+
+                            return (
+                                <div className="userItem" key={user.socketId}>
+                                    <div className="userAvatar">
+                                        {(user.name || 'U')[0].toUpperCase()}
+                                        {isUserHost && (
+                                            <span className="hostBadge" title="Host">
+                                                <StarIcon sx={{ fontSize: '0.9rem' }} />
+                                            </span>
                                         )}
-                                    </span>
-                                    <span className="userStatus">● In call</span>
+                                    </div>
+                                    <div className="userInfo">
+                                        <span className="userName">
+                                            {user.name || 'Unknown'}
+                                            {isCurrentUser && (
+                                                <span className="youBadge"> (You)</span>
+                                            )}
+                                            {isUserHost && !isCurrentUser && (
+                                                <span className="hostLabel"> (Host)</span>
+                                            )}
+                                        </span>
+                                        <div className="user-media-status">
+                                            {!audioOn && (
+                                                <span className="status-icon muted" title="Muted">
+                                                    <MicOffIcon sx={{ fontSize: '0.9rem' }} />
+                                                </span>
+                                            )}
+                                            {!videoOn && (
+                                                <span className="status-icon video-off" title="Camera off">
+                                                    <VideocamOffIcon sx={{ fontSize: '0.9rem' }} />
+                                                </span>
+                                            )}
+                                            {audioOn && videoOn && (
+                                                <span className="userStatus">● In call</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Host Controls */}
+                                    {isHost && !isCurrentUser && (
+                                        <div className="hostControls">
+                                            {/* Only show mute button if user's audio is ON */}
+                                            {audioOn && (
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleMuteUser(user.socketId)}
+                                                    title="Mute participant"
+                                                    sx={{
+                                                        color: 'rgba(255, 255, 255, 0.6)',
+                                                        '&:hover': { color: '#ff4757' }
+                                                    }}
+                                                >
+                                                    <MicOffIcon sx={{ fontSize: '1rem' }} />
+                                                </IconButton>
+                                            )}
+
+                                            {/* Only show video-off button if user's video is ON */}
+                                            {videoOn && (
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleVideoOffUser(user.socketId)}
+                                                    title="Turn off camera"
+                                                    sx={{
+                                                        color: 'rgba(255, 255, 255, 0.6)',
+                                                        '&:hover': { color: '#ff4757' }
+                                                    }}
+                                                >
+                                                    <VideocamOffIcon sx={{ fontSize: '1rem' }} />
+                                                </IconButton>
+                                            )}
+
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => setShowTransferConfirm(user.socketId)}
+                                                title="Make host"
+                                                sx={{
+                                                    color: 'rgba(255, 255, 255, 0.6)',
+                                                    '&:hover': { color: '#ffd700' }
+                                                }}
+                                            >
+                                                <StarIcon sx={{ fontSize: '1rem' }} />
+                                            </IconButton>
+
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => setShowKickConfirm(user.socketId)}
+                                                title="Remove participant"
+                                                sx={{
+                                                    color: 'rgba(255, 255, 255, 0.6)',
+                                                    '&:hover': { color: '#ff4757' }
+                                                }}
+                                            >
+                                                <PersonRemoveIcon sx={{ fontSize: '1rem' }} />
+                                            </IconButton>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Kick Confirmation Dialog */}
+            {showKickConfirm && (
+                <div className="confirmDialog" onClick={() => setShowKickConfirm(null)}>
+                    <div className="confirmDialogContent" onClick={(e) => e.stopPropagation()}>
+                        <h3>Remove Participant?</h3>
+                        <p>
+                            Are you sure you want to remove{' '}
+                            {connectedUsers.find(u => u.socketId === showKickConfirm)?.name || 'this user'}{' '}
+                            from the meeting?
+                        </p>
+                        <div className="confirmDialogActions">
+                            <Button
+                                onClick={() => setShowKickConfirm(null)}
+                                variant="outlined"
+                                sx={{
+                                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                                    color: '#fff',
+                                    '&:hover': { borderColor: '#fff' }
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={() => handleKickUser(showKickConfirm)}
+                                variant="contained"
+                                sx={{
+                                    background: 'linear-gradient(135deg, #ff4757, #c0392b)',
+                                    color: '#fff',
+                                    '&:hover': { background: 'linear-gradient(135deg, #ff6b6b, #e74c3c)' }
+                                }}
+                            >
+                                Remove
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Transfer Host Confirmation Dialog */}
+            {showTransferConfirm && (
+                <div className="confirmDialog" onClick={() => setShowTransferConfirm(null)}>
+                    <div className="confirmDialogContent" onClick={(e) => e.stopPropagation()}>
+                        <h3>Transfer Host Privileges?</h3>
+                        <p>
+                            Are you sure you want to make{' '}
+                            {connectedUsers.find(u => u.socketId === showTransferConfirm)?.name || 'this user'}{' '}
+                            the new host? You will lose host privileges.
+                        </p>
+                        <div className="confirmDialogActions">
+                            <Button
+                                onClick={() => setShowTransferConfirm(null)}
+                                variant="outlined"
+                                sx={{
+                                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                                    color: '#fff',
+                                    '&:hover': { borderColor: '#fff' }
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={() => handleTransferHost(showTransferConfirm)}
+                                variant="contained"
+                                sx={{
+                                    background: 'linear-gradient(135deg, #ffd700, #ffb700)',
+                                    color: '#000',
+                                    fontWeight: 600,
+                                    '&:hover': { background: 'linear-gradient(135deg, #ffe44d, #ffd700)' }
+                                }}
+                            >
+                                Transfer
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -644,7 +1254,19 @@ export default function VideoMeetComponent() {
             {/* ── Control Bar ─────────────────────────────────────────── */}
             <div className="buttonContainers">
                 <IconButton
-                    onClick={() => setVideo(v => !v)}
+                    onClick={() => {
+                        setVideo(v => {
+                            const newState = !v;
+                            // Broadcast media state change
+                            if (socketRef.current) {
+                                socketRef.current.emit('media-state-change', {
+                                    video: newState,
+                                    audio: audio
+                                });
+                            }
+                            return newState;
+                        });
+                    }}
                     className={video ? 'activeIcon' : 'inactiveIcon'}
                     title={video ? 'Turn off camera' : 'Turn on camera'}
                 >
@@ -656,7 +1278,19 @@ export default function VideoMeetComponent() {
                 </IconButton>
 
                 <IconButton
-                    onClick={() => setAudio(a => !a)}
+                    onClick={() => {
+                        setAudio(a => {
+                            const newState = !a;
+                            // Broadcast media state change
+                            if (socketRef.current) {
+                                socketRef.current.emit('media-state-change', {
+                                    video: video,
+                                    audio: newState
+                                });
+                            }
+                            return newState;
+                        });
+                    }}
                     className={audio ? 'activeIcon' : 'inactiveIcon'}
                     title={audio ? 'Mute' : 'Unmute'}
                 >
@@ -718,9 +1352,17 @@ export default function VideoMeetComponent() {
                         stream={v.stream}
                         socketId={v.socketId}
                         username={socketToUsername[v.socketId] || ''}
+                        mediaState={participantMediaState[v.socketId]}
                     />
                 ))}
             </div>
+
+            {/* Flash Notification */}
+            {notification && (
+                <div className={`flash-notification ${notification.type}`}>
+                    {notification.message}
+                </div>
+            )}
         </div>
     );
 }
