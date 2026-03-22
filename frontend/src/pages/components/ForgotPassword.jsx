@@ -225,14 +225,21 @@ function ForgotPassword({ open, handleClose }) {
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
                       sx={{
-                        border: 'none',
-                        outline: 'none',
-                        '&:focus': { outline: 'none' },
-                        '&:hover': { backgroundColor: 'transparent' },
-                        color: 'text.secondary',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        transition: 'all 0.2s ease-in-out',
+                        color: showPassword ? 'primary.main' : 'text.secondary',
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                          color: 'primary.main',
+                          transform: 'scale(1.05)',
+                        },
+                        '&:active': {
+                          transform: 'scale(0.95)',
+                        },
                       }}
                     >
-                      {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                      {showPassword ? <VisibilityOff fontSize="medium" /> : <Visibility fontSize="medium" />}
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -256,14 +263,21 @@ function ForgotPassword({ open, handleClose }) {
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       edge="end"
                       sx={{
-                        border: 'none',
-                        outline: 'none',
-                        '&:focus': { outline: 'none' },
-                        '&:hover': { backgroundColor: 'transparent' },
-                        color: 'text.secondary',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        transition: 'all 0.2s ease-in-out',
+                        color: showConfirmPassword ? 'primary.main' : 'text.secondary',
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                          color: 'primary.main',
+                          transform: 'scale(1.05)',
+                        },
+                        '&:active': {
+                          transform: 'scale(0.95)',
+                        },
                       }}
                     >
-                      {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                      {showConfirmPassword ? <VisibilityOff fontSize="medium" /> : <Visibility fontSize="medium" />}
                     </IconButton>
                   </InputAdornment>
                 ),
