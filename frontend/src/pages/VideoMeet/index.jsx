@@ -13,6 +13,7 @@ import ChatPanel from './components/ChatPanel';
 import ParticipantsPanel from './components/ParticipantsPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import ControlBar from './components/ControlBar';
+import CollabNotepad from '../components/CollabNotepad';
 
 const SERVER_URL = "http://localhost:3000";
 const AI_SENDER  = "🤖 AI Assistant";
@@ -54,6 +55,7 @@ export default function VideoMeetComponent() {
     // UI panels
     let [showModal,      setModal]      = useState(false);
     let [showUsersPanel, setShowUsersPanel] = useState(false);
+    let [showNotepad,    setShowNotepad]    = useState(false);
 
     // Chat
     let [messages,    setMessages]    = useState([]);
@@ -620,6 +622,14 @@ export default function VideoMeetComponent() {
         setShowUsersPanel(prev => !prev);
     };
 
+    const handleNotepadToggle = () => {
+        if (!showNotepad) {
+            setModal(false);
+            setShowUsersPanel(false);
+        }
+        setShowNotepad(prev => !prev);
+    };
+
     // ── Render ───────────────────────────────────────────────────────────────
     if (askForUsername) {
         return (
@@ -659,7 +669,7 @@ export default function VideoMeetComponent() {
                 handleChatToggle={handleChatToggle}
             />
 
-            <ParticipantsPanel 
+            <ParticipantsPanel
                 showUsersPanel={showUsersPanel}
                 connectedUsers={connectedUsers}
                 isHost={isHost}
@@ -677,6 +687,14 @@ export default function VideoMeetComponent() {
                 handleUsersToggle={handleUsersToggle}
             />
 
+            {showNotepad && (
+                <CollabNotepad
+                    roomId={window.location.href}
+                    userName={username}
+                    onClose={handleNotepadToggle}
+                />
+            )}
+
             <ConfirmDialog 
                 showKickConfirm={showKickConfirm}
                 setShowKickConfirm={setShowKickConfirm}
@@ -687,7 +705,7 @@ export default function VideoMeetComponent() {
                 connectedUsers={connectedUsers}
             />
 
-            <ControlBar 
+            <ControlBar
                 video={video}
                 setVideo={setVideo}
                 audio={audio}
@@ -703,6 +721,8 @@ export default function VideoMeetComponent() {
                 connectedUsersLength={connectedUsers.length}
                 handleUsersToggle={handleUsersToggle}
                 showUsersPanel={showUsersPanel}
+                handleNotepadToggle={handleNotepadToggle}
+                showNotepad={showNotepad}
             />
 
             {/* ── Local Video PIP ──────────────────────────────────────── */}

@@ -7,12 +7,14 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/app.js",
-    "start": "node src/app.js",
-    "prod": "pm2 src/app.js"
+    "dev": "concurrently \"nodemon src/app.js\" \"node src/yjsServer.js\"",
+    "start": "concurrently \"node src/app.js\" \"node src/yjsServer.js\"",
+    "prod": "pm2 src/app.js",
+    "yjs": "node src/yjsServer.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "concurrently": "^9.2.1",
     "cors": "^2.8.6",
     "crypto": "^1.0.1",
     "dotenv": "^17.3.1",
@@ -24,6 +26,9 @@
     "nodemon": "^3.1.11",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "ws": "^8.18.0",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.30"
   }
 }

@@ -10,6 +10,7 @@ import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
 import ChatIcon from '@mui/icons-material/Chat';
 import PeopleIcon from '@mui/icons-material/People';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 
 export default function ControlBar({
     video,
@@ -26,7 +27,9 @@ export default function ControlBar({
     showModal,
     connectedUsersLength,
     handleUsersToggle,
-    showUsersPanel
+    showUsersPanel,
+    handleNotepadToggle,
+    showNotepad
 }) {
     return (
         <div className="buttonContainers">
@@ -102,6 +105,14 @@ export default function ControlBar({
                     <PeopleIcon />
                 </IconButton>
             </Badge>
+
+            <IconButton
+                onClick={handleNotepadToggle}
+                className={showNotepad ? 'activeIcon' : 'inactiveIcon'}
+                title="Collaborative Notepad"
+            >
+                <EditNoteIcon />
+            </IconButton>
         </div>
     );
 }
