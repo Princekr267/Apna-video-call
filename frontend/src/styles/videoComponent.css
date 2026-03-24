@@ -1,7 +1,7 @@
 /* Animated background wrapper */
 .meetVideoContainer {
-    position: relative;
-    height: 100vh;
+    position: fixed;
+    inset: 0;
     background: linear-gradient(-45deg, #0f172a, #1e1b4b, #020617, #172554);
     background-size: 400% 400%;
     animation: gradientBG 15s ease infinite;
@@ -71,7 +71,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    height: 100%;
     padding: 30px;
     gap: 25px;
     padding-bottom: 120px;
@@ -348,7 +348,7 @@
     background: rgba(15, 20, 35, 0.8);
     backdrop-filter: blur(25px);
     -webkit-backdrop-filter: blur(25px);
-    height: calc(100vh - 40px);
+    height: calc(100% - 40px);
     width: 360px;
     right: 20px;
     top: 20px;
@@ -833,9 +833,9 @@
     flex-direction: row; /* Desktop split */
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    position: fixed;
+    inset: 0;
     background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop') center/cover;
-    position: relative;
     color: white;
 }
 

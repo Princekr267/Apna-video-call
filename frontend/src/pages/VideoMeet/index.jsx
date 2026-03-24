@@ -160,6 +160,13 @@ export default function VideoMeetComponent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Lock body scroll while in meeting (prevents keyboard/viewport shift)
+    useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prev; };
+    }, []);
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -170,9 +177,10 @@ export default function VideoMeetComponent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto-scroll chat
+    // Auto-scroll chat (use scrollTop instead of scrollIntoView to avoid scrolling the whole page)
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const el = messagesEndRef.current?.parentElement;
+        if (el) el.scrollTop = el.scrollHeight;
     }, [messages]);
 
     // ── Local stream management ─────────────────────────────────────────────
@@ -392,11 +400,27 @@ export default function VideoMeetComponent() {
         }
 
         try {
-            const response = await ai.models.generateContent({
+            // Use streaming so chunks appear in real-time (much faster perceived response)
+            const stream = await ai.models.generateContentStream({
                 model: 'gemini-3.1-flash-lite-preview',
                 contents: prompt,
             });
-            socketRef.current.emit('chat-message', response.text, AI_SENDER);
+
+            let accumulated = '';
+            // Insert a placeholder message that we'll update live
+            setMessages(prev => [...prev, { sender: AI_SENDER, data: '…', type: 'text' }]);
+
+            for await (const chunk of stream) {
+                accumulated += chunk.text;
+                setMessages(prev => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = { sender: AI_SENDER, data: accumulated, type: 'text' };
+                    return updated;
+                });
+            }
+
+            // Broadcast the final full response so other participants also see it
+            socketRef.current.emit('chat-message', accumulated, AI_SENDER);
         } catch (e) {
             const code = e?.status || e?.code;
             const msg =
