@@ -81,6 +81,7 @@ export default function VideoMeetComponent() {
 
     // Participants
     const [socketToUsername, setSocketToUsername] = useState({});
+    const socketToUsernameRef = useRef({});
     const [connectedUsers,   setConnectedUsers]   = useState([]);
     const [participantMediaState, setParticipantMediaState] = useState({});
 
@@ -460,7 +461,23 @@ export default function VideoMeetComponent() {
                 }
             }, 500);
 
-            setConnectedUsers([{ socketId: socketRef.current.id, name: username }]);
+            // Seed our own entry immediately so our name shows in VideoTile lookups
+            setSocketToUsername(prev => ({ ...prev, [socketRef.current.id]: username }));
+            // Add ourselves to the list (peers will arrive via user-joined)
+            setConnectedUsers(prev => {
+                if (prev.find(u => u.socketId === socketRef.current.id)) return prev;
+                return [...prev, { socketId: socketRef.current.id, name: username }];
+            });
+
+            socketRef.current.on('all-users-names', (namesDict) => {
+                socketToUsernameRef.current = { ...socketToUsernameRef.current, ...namesDict };
+                setSocketToUsername(prev => ({ ...prev, ...namesDict }));
+                setConnectedUsers(prev => prev.map(u => namesDict[u.socketId] ? { ...u, name: namesDict[u.socketId] } : u));
+            });
+
+            socketRef.current.on('all-users-media-states', (mediaStatesDict) => {
+                setParticipantMediaState(prev => ({ ...prev, ...mediaStatesDict }));
+            });
 
             socketRef.current.on('chat-message', addMessage);
 
@@ -476,6 +493,7 @@ export default function VideoMeetComponent() {
             });
 
             socketRef.current.on('user-username', (socketId, uname) => {
+                socketToUsernameRef.current[socketId] = uname;
                 setSocketToUsername(prev => ({ ...prev, [socketId]: uname }));
                 setConnectedUsers(prev => {
                     const exists = prev.find(u => u.socketId === socketId);
@@ -530,7 +548,8 @@ export default function VideoMeetComponent() {
                     if (peerId !== socketIdRef.current) {
                         setConnectedUsers(prev => {
                             if (prev.find(u => u.socketId === peerId)) return prev;
-                            return [...prev, { socketId: peerId, name: socketToUsername[peerId] || 'User' }];
+                            const uname = socketToUsernameRef.current[peerId] || 'User';
+                            return [...prev, { socketId: peerId, name: uname }];
                         });
                     }
                 });
@@ -757,9 +776,10 @@ export default function VideoMeetComponent() {
 
             {showNotepad && (
                 <CollabNotepad
-                    roomId={window.location.href}
+                    roomId={window.location.pathname}
                     userName={username}
                     onClose={handleNotepadToggle}
+                    socket={socketRef.current}
                 />
             )}
 
@@ -828,7 +848,7 @@ export default function VideoMeetComponent() {
                         key={v.socketId}
                         stream={v.stream}
                         socketId={v.socketId}
-                        username={socketToUsername[v.socketId] || ''}
+                        username={connectedUsers.find(u => u.socketId === v.socketId)?.name || socketToUsername[v.socketId] || ''}
                         mediaState={participantMediaState[v.socketId]}
                     />
                 ))}

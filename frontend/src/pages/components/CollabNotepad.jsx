@@ -16,8 +16,6 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
 import Quill from 'quill';
 import QuillCursors from 'quill-cursors';
 import IconButton from '@mui/material/IconButton';
@@ -36,7 +34,6 @@ import FormatStrikethroughIcon from '@mui/icons-material/FormatStrikethrough';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import CodeIcon from '@mui/icons-material/Code';
-import servers from '../../enviroment';
 import TitleIcon from '@mui/icons-material/Title';
 import FormatClearIcon from '@mui/icons-material/FormatClear';
 import 'quill/dist/quill.snow.css';
@@ -101,23 +98,10 @@ const getUserColor = (name) => {
     return colors[Math.abs(hash) % colors.length];
 };
 
-// Get Yjs WebSocket server URL based on environment
-const getYjsServerUrl = () => {
-    const yjsServerUrl = import.meta.env.VITE_YJS_SERVER_URL;
-    if (yjsServerUrl) {
-        // Use WSS protocol and /yjs path on production
-        return yjsServerUrl.replace('https://', 'wss://').replace('http://', 'ws://') + '/yjs';
-    }
-    // Fallback to backend server URL from environment configuration
-    return servers.replace('https://', 'wss://').replace('http://', 'ws://') + '/yjs';
-};
-
-const CollabNotepad = ({ roomId, userName, onClose }) => {
+const CollabNotepad = ({ roomId, userName, onClose, socket }) => {
     const editorRef = useRef(null);
+    const toolbarRef = useRef(null);
     const quillRef = useRef(null);
-    const yDocRef = useRef(null);
-    const providerRef = useRef(null);
-    const undoManagerRef = useRef(null);
     const [isConnected, setIsConnected] = useState(false);
     const [isCollabEnabled, setIsCollabEnabled] = useState(true);
     const [activeUsers, setActiveUsers] = useState([]);
@@ -127,12 +111,12 @@ const CollabNotepad = ({ roomId, userName, onClose }) => {
         ? userName.trim()
         : `User-${Math.random().toString(36).substring(2, 7)}`;
 
-    // Sanitize roomId for use as Yjs document name
-    const sanitizedRoomId = roomId.replace(/[^a-zA-Z0-9-_]/g, '_');
+    // Sanitize roomId
+    const sanitizedRoomId = roomId.replace(/[^a-zA-Z0-9-_]/g, '_').replace(/^_+/, '').slice(0, 100) || 'default';
 
     // Initialize Quill editor (always)
     useEffect(() => {
-        if (!editorRef.current || quillRef.current) return;
+        if (!editorRef.current || quillRef.current || !toolbarRef.current) return;
 
         // Initialize Quill editor
         const quill = new Quill(editorRef.current, {
@@ -140,7 +124,7 @@ const CollabNotepad = ({ roomId, userName, onClose }) => {
             modules: {
                 cursors: true,
                 toolbar: {
-                    container: '#notepad-toolbar'
+                    container: toolbarRef.current
                 },
                 history: {
                     userOnly: true
@@ -154,269 +138,137 @@ const CollabNotepad = ({ roomId, userName, onClose }) => {
         const handleKeydown = (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
                 e.preventDefault();
-                if (e.shiftKey) {
-                    if (undoManagerRef.current) {
-                        undoManagerRef.current.redo();
-                    } else {
-                        document.execCommand('redo');
-                    }
-                } else {
-                    if (undoManagerRef.current) {
-                        undoManagerRef.current.undo();
-                    } else {
-                        document.execCommand('undo');
-                    }
-                }
+                if (e.shiftKey) quill.history.redo();
+                else quill.history.undo();
             } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
                 e.preventDefault();
-                if (undoManagerRef.current) {
-                    undoManagerRef.current.redo();
-                } else {
-                    document.execCommand('redo');
-                }
+                quill.history.redo();
             }
         };
 
         editorRef.current.addEventListener('keydown', handleKeydown);
 
-        // Cleanup function
+        // Cleanup
         return () => {
             editorRef.current?.removeEventListener('keydown', handleKeydown);
-
             if (quillRef.current) {
                 quillRef.current = null;
             }
         };
     }, []);
 
-    // Initialize/teardown Yjs collaboration when toggle changes
+    // Socket.io Collaboration Sync
     useEffect(() => {
-        if (!quillRef.current || !isCollabEnabled) {
-            // Cleanup YJS if it was previously connected
-            if (providerRef.current) {
-                providerRef.current.disconnect();
-                providerRef.current.destroy();
-                providerRef.current = null;
-            }
-
-            if (undoManagerRef.current) {
-                undoManagerRef.current.destroy();
-                undoManagerRef.current = null;
-            }
-
-            if (yDocRef.current) {
-                yDocRef.current.destroy();
-                yDocRef.current = null;
-            }
-
+        if (!quillRef.current || !socket || !isCollabEnabled) {
             setIsConnected(false);
             setActiveUsers([]);
             return;
         }
 
         const quill = quillRef.current;
+        setIsConnected(true);
 
-        // Save current content before switching to collab
-        const currentContent = quill.getContents();
+        const cursors = quill.getModule('cursors');
+        const userColor = getUserColor(sanitizedUserName);
 
-        // Create Y.Doc for this room
-        const ydoc = new Y.Doc();
-        yDocRef.current = ydoc;
+        let isApplyingRemoteUpdate = false;
 
-        // Create WebSocket provider with room namespace
-        const wsUrl = getYjsServerUrl();
-        const provider = new WebsocketProvider(wsUrl, sanitizedRoomId, ydoc);
-        providerRef.current = provider;
-
-        // Connection status tracking
-        provider.on('status', ({ status }) => {
-            setIsConnected(status === 'connected');
-        });
-
-        // Get Y.Text for document content
-        const ytext = ydoc.getText('quill');
-
-        // Setup Yjs UndoManager
-        const undoManager = new Y.UndoManager(ytext);
-        undoManagerRef.current = undoManager;
-
-        // Bind Quill to Y.Text for real-time sync
-        let isUpdatingFromYjs = false;
-
-        // Sync initial content from Yjs to Quill or restore previous content
-        provider.once('sync', (isSynced) => {
-            if (isSynced) {
-                const yjsContent = ytext.toDelta();
-                if (yjsContent.length > 0) {
-                    // Use YJS content if available
-                    quill.setContents(yjsContent, 'silent');
-                } else {
-                    // If YJS is empty, push current content to YJS
-                    if (currentContent.ops.some(op => op.insert && op.insert.trim())) {
-                        ydoc.transact(() => {
-                            let index = 0;
-                            currentContent.ops.forEach(op => {
-                                if (op.insert !== undefined) {
-                                    const text = typeof op.insert === 'string' ? op.insert : '\n';
-                                    ytext.insert(index, text, op.attributes || {});
-                                    index += text.length;
-                                }
-                            });
-                        });
-                    }
-                }
-            }
-        });
-
-        // Listen for remote changes from Yjs
-        ytext.observe((event) => {
-            if (event.transaction.local) return;
-
-            isUpdatingFromYjs = true;
-            const delta = event.delta;
-
-            let index = 0;
-            delta.forEach(op => {
-                if (op.retain !== undefined) {
-                    index += op.retain;
-                } else if (op.insert !== undefined) {
-                    quill.insertText(index, op.insert, op.attributes || {}, 'silent');
-                    index += typeof op.insert === 'string' ? op.insert.length : 1;
-                } else if (op.delete !== undefined) {
-                    quill.deleteText(index, op.delete, 'silent');
-                }
-            });
-
-            isUpdatingFromYjs = false;
-        });
-
-        // Listen for local changes from Quill
-        const handleTextChange = (delta, oldDelta, source) => {
-            if (source !== 'user' || isUpdatingFromYjs) return;
-
-            ydoc.transact(() => {
-                let index = 0;
-                delta.ops.forEach(op => {
-                    if (op.retain !== undefined) {
-                        if (op.attributes) {
-                            ytext.format(index, op.retain, op.attributes);
-                        }
-                        index += op.retain;
-                    } else if (op.insert !== undefined) {
-                        const text = typeof op.insert === 'string' ? op.insert : '\n';
-                        ytext.insert(index, text, op.attributes || {});
-                        index += text.length;
-                    } else if (op.delete !== undefined) {
-                        ytext.delete(index, op.delete);
-                    }
-                });
-            });
+        // --- Text Sync ---
+        const handleNotepadUpdate = (delta) => {
+            isApplyingRemoteUpdate = true;
+            quill.updateContents(delta, 'silent');
+            isApplyingRemoteUpdate = false;
         };
 
-        quill.on('text-change', handleTextChange);
+        const handleTextChange = (delta, oldDelta, source) => {
+            if (source !== 'user' || isApplyingRemoteUpdate) return;
+            socket.emit('notepad-update', delta, sanitizedRoomId);
+        };
 
-        // Setup awareness for multi-user cursors
-        const awareness = provider.awareness;
-        const cursors = quill.getModule('cursors');
-
-        // Set local user info
-        const userColor = getUserColor(sanitizedUserName);
-        awareness.setLocalStateField('user', {
-            name: sanitizedUserName,
-            color: userColor
-        });
-
-        // Track cursor position
+        // --- Multi-User Cursors ---
         const handleSelectionChange = (range) => {
             if (range) {
-                awareness.setLocalStateField('cursor', {
-                    index: range.index,
-                    length: range.length
+                socket.emit('notepad-cursor', {
+                    name: sanitizedUserName,
+                    color: userColor,
+                    cursor: range
+                }, sanitizedRoomId);
+            }
+        };
+
+        const handleRemoteCursor = (cursorData, clientId) => {
+            if (!cursorData || !cursorData.cursor) {
+                cursors.removeCursor(clientId);
+                setActiveUsers(prev => prev.filter(u => u.clientId !== clientId));
+            } else {
+                try {
+                    cursors.createCursor(clientId, cursorData.name, cursorData.color);
+                    cursors.moveCursor(clientId, cursorData.cursor);
+                } catch (e) {}
+
+                setActiveUsers(prev => {
+                    const arr = prev.filter(u => u.clientId !== clientId);
+                    arr.push({ clientId, name: cursorData.name, color: cursorData.color });
+                    return arr;
                 });
             }
         };
 
-        quill.on('selection-change', handleSelectionChange);
+        // --- Document Bootstrap (Late joiners) ---
+        let hasReceivedSync = false;
+        
+        // Request the full document content from existing users in the room
+        socket.emit("notepad-request-sync", sanitizedRoomId);
 
-        // Render remote cursors and track active users
-        const handleAwarenessChange = () => {
-            const states = awareness.getStates();
-            const users = [];
-
-            cursors.clearCursors();
-
-            states.forEach((state, clientId) => {
-                if (state.user) {
-                    users.push({ ...state.user, clientId });
-                }
-
-                if (clientId === awareness.clientID) return;
-
-                const user = state.user;
-                const cursor = state.cursor;
-
-                if (user && cursor) {
-                    try {
-                        cursors.createCursor(
-                            clientId.toString(),
-                            user.name,
-                            user.color
-                        );
-                        cursors.moveCursor(clientId.toString(), cursor);
-                    } catch (e) {
-                        // Cursor position may be invalid
-                    }
-                }
-            });
-
-            setActiveUsers(users);
+        const handleNotepadRequestSync = (requesterSocketId) => {
+            // Someone requested a full sync. Send our current contents back directly.
+            const contents = quill.getContents();
+            socket.emit("notepad-full-sync", contents, requesterSocketId);
         };
 
-        awareness.on('change', handleAwarenessChange);
+        const handleNotepadFullSync = (contents) => {
+            // We received a full sync from someone. Apply it cleanly.
+            if (!hasReceivedSync) {
+                quill.setContents(contents, 'silent');
+                hasReceivedSync = true;
+            }
+        };
 
-        // Cleanup function
+        // Attach listeners to Socket.IO backend
+        socket.on('notepad-update', handleNotepadUpdate);
+        socket.on('notepad-cursor', handleRemoteCursor);
+        socket.on('notepad-request-sync', handleNotepadRequestSync);
+        socket.on('notepad-full-sync', handleNotepadFullSync);
+        
+        quill.on('text-change', handleTextChange);
+        quill.on('selection-change', handleSelectionChange);
+
         return () => {
+            socket.off('notepad-update', handleNotepadUpdate);
+            socket.off('notepad-cursor', handleRemoteCursor);
+            socket.off('notepad-request-sync', handleNotepadRequestSync);
+            socket.off('notepad-full-sync', handleNotepadFullSync);
+
+            // Emit a blank cursor to clear us from remote screens when we toggle off or unmount
+            socket.emit('notepad-cursor', null, sanitizedRoomId);
+
             quill.off('text-change', handleTextChange);
             quill.off('selection-change', handleSelectionChange);
-            awareness.off('change', handleAwarenessChange);
-
-            if (providerRef.current) {
-                providerRef.current.disconnect();
-                providerRef.current.destroy();
-                providerRef.current = null;
-            }
-
-            if (yDocRef.current) {
-                yDocRef.current.destroy();
-                yDocRef.current = null;
-            }
-
-            if (undoManagerRef.current) {
-                undoManagerRef.current.destroy();
-                undoManagerRef.current = null;
-            }
 
             setIsConnected(false);
             setActiveUsers([]);
+            cursors.clearCursors();
         };
-    }, [sanitizedRoomId, userName, isCollabEnabled]);
+    }, [sanitizedRoomId, userName, isCollabEnabled, socket]);
 
     // Handle undo
     const handleUndo = useCallback(() => {
-        if (undoManagerRef.current) {
-            undoManagerRef.current.undo();
-        } else {
-            quillRef.current?.history.undo();
-        }
+        quillRef.current?.history.undo();
     }, []);
 
     // Handle redo
     const handleRedo = useCallback(() => {
-        if (undoManagerRef.current) {
-            undoManagerRef.current.redo();
-        } else {
-            quillRef.current?.history.redo();
-        }
+        quillRef.current?.history.redo();
     }, []);
 
     // Handle collaboration toggle
@@ -503,7 +355,7 @@ const CollabNotepad = ({ roomId, userName, onClose }) => {
             )}
 
             {/* Custom Toolbar */}
-            <div id="notepad-toolbar" className="notepad-toolbar">
+            <div ref={toolbarRef} className="notepad-toolbar">
                 <div className="notepad-toolbar-group">
                     <Tooltip title="Bold (Ctrl+B)">
                         <button className="ql-bold"><FormatBoldIcon /></button>

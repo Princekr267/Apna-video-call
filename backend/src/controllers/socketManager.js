@@ -6,6 +6,8 @@ let timeOnline = {}
 let roomHosts = {}
 let roomLocks = {}
 let socketToRoom = {}
+let socketToUsername = {}
+let socketToMediaState = {}
 
 // Helper function to check if a user is the host of a room
 const isHost = (socketId, roomPath) => {
@@ -52,6 +54,22 @@ export const connectToSocket = (server) => {
                 isLocked: roomLocks[path]
             });
 
+            const roomUsernames = {};
+            const roomMediaStates = {};
+            if (connection[path]) {
+                for (let a = 0; a < connection[path].length; a++) {
+                    const id = connection[path][a];
+                    if (socketToUsername[id]) {
+                        roomUsernames[id] = socketToUsername[id];
+                    }
+                    if (socketToMediaState[id]) {
+                        roomMediaStates[id] = socketToMediaState[id];
+                    }
+                }
+            }
+            socket.emit("all-users-names", roomUsernames);
+            socket.emit("all-users-media-states", roomMediaStates);
+
             for(let a=0; a<connection[path].length; a++){
                 io.to(connection[path][a]).emit("user-joined", socket.id, connection[path]);
             }
@@ -60,6 +78,7 @@ export const connectToSocket = (server) => {
             io.to(toId).emit("signal", socket.id, message);
         })
         socket.on("set-username", (username) => {
+            socketToUsername[socket.id] = username;
             const [matchingRoom, found] = Object.entries(connection)
                 .reduce(([room, isFound], [roomKey, roomValue]) => {
                     if(!isFound && roomValue.includes(socket.id)) return [roomKey, true];
@@ -86,13 +105,41 @@ export const connectToSocket = (server) => {
                     messages[matchingRoom] = []
                 }
                 messages[matchingRoom].push({"sender": sender, "data": data, "socket-id-sender": socket.id})
-                console.log("messages", matchingRoom, ": ", sender, data);  //  KeyboardEvent is written in place of matching room if any error happens after this chage revert it
 
                 connection[matchingRoom].forEach((ele) => {
                     io.to(ele).emit("chat-message", data, sender, socket.id);
                 })
             }
         })
+
+        socket.on("notepad-update", (delta, roomPath) => {
+            if(connection[roomPath]) {
+                connection[roomPath].forEach((ele) => {
+                    if (ele !== socket.id) io.to(ele).emit("notepad-update", delta);
+                })
+            }
+        });
+
+        socket.on("notepad-cursor", (cursorData, roomPath) => {
+            if(connection[roomPath]) {
+                connection[roomPath].forEach((ele) => {
+                    if (ele !== socket.id) io.to(ele).emit("notepad-cursor", cursorData, socket.id);
+                })
+            }
+        });
+
+        socket.on("notepad-request-sync", (roomPath) => {
+            if(connection[roomPath]) {
+                const others = connection[roomPath].filter(id => id !== socket.id);
+                if (others.length > 0) {
+                    io.to(others[0]).emit("notepad-request-sync", socket.id);
+                }
+            }
+        });
+
+        socket.on("notepad-full-sync", (contents, targetSocketId) => {
+            io.to(targetSocketId).emit("notepad-full-sync", contents);
+        });
 
         socket.on("file-message", (fileData, sender) => {
             const [matchingRoom, found] = Object.entries(connection)
@@ -112,7 +159,6 @@ export const connectToSocket = (server) => {
                     "socket-id-sender": socket.id,
                     "type": "file"
                 })
-                console.log("file shared in", matchingRoom, ": ", sender, fileData.name);
 
                 connection[matchingRoom].forEach((ele) => {
                     io.to(ele).emit("file-message", fileData, sender, socket.id);
@@ -121,6 +167,7 @@ export const connectToSocket = (server) => {
         })
 
         socket.on("media-state-change", (mediaState) => {
+            socketToMediaState[socket.id] = mediaState;
             const [matchingRoom, found] = Object.entries(connection)
                 .reduce(([room, isFound], [roomKey, roomValue]) => {
                     if(!isFound && roomValue.includes(socket.id)){
@@ -266,6 +313,8 @@ export const connectToSocket = (server) => {
 
             // Cleanup socket to room mapping
             delete socketToRoom[socket.id];
+            delete socketToUsername[socket.id];
+            delete socketToMediaState[socket.id];
         })
     })
     return io;

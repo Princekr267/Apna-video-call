@@ -80,17 +80,14 @@
 }
 
 .conferenceView video {
-    height: 60vh;
-    max-width: 45vw;
-    border-radius: 24px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
     background: #000;
 }
 .conferenceView video:hover {
     transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 40px rgba(0, 136, 255, 0.15);
 }
 
 /* Video Placeholders and states */
@@ -104,8 +101,18 @@
     background: rgba(15, 20, 35, 0.6);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255,255,255,0.05);
-    box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
     animation: fadeInTile 0.6s ease forwards;
+    
+    flex: 1 1 40%;
+    max-width: 45vw;
+    max-height: 42vh;
+    aspect-ratio: 16 / 9;
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.4s ease;
+}
+.video-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 40px rgba(0, 136, 255, 0.15);
 }
 @keyframes fadeInTile {
     from { opacity: 0; transform: scale(0.9); }
@@ -117,9 +124,7 @@
 }
 
 .video-card--off {
-    height: 60vh;
-    width: 45vw;
-    max-width: 800px;
+    background: rgba(15, 20, 35, 0.8);
 }
 
 .video-avatar-placeholder {
@@ -945,14 +950,13 @@
     padding-bottom: 140px;
     align-content: flex-start;
   }
-  .conferenceView video {
-    height: auto;
-    max-height: 40vh;
+  .video-card {
+    flex: 1 1 100%;
     max-width: 100%;
-    width: 100%;
+    max-height: 35vh;
   }
-  .video-card--off {
-    height: 35vh;
+  .conferenceView video {
+    height: 100%;
     width: 100%;
   }
   .buttonContainers {
