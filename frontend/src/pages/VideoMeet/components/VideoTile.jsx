@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import VideocamOffIcon from '@mui/icons-material/VideocamOff';
 import MicOffIcon from '@mui/icons-material/MicOff';
 
-const VideoTile = React.memo(({ stream, socketId, username, mediaState }) => {
+const VideoTile = React.memo(({ stream, socketId, username, mediaState, isScreenSharing = false, isPinned = false }) => {
     const videoRef = useRef();
     const initial  = (username || '?')[0].toUpperCase();
 
@@ -12,7 +12,9 @@ const VideoTile = React.memo(({ stream, socketId, username, mediaState }) => {
     const [hasVideo, setHasVideo] = useState(() => isVideoLive(stream));
 
     useEffect(() => {
-        if (videoRef.current && stream) videoRef.current.srcObject = stream;
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
 
         if (!stream) { setHasVideo(false); return; }
 
@@ -36,7 +38,7 @@ const VideoTile = React.memo(({ stream, socketId, username, mediaState }) => {
     const audioOn = mediaState?.audio !== undefined ? mediaState.audio : true;
 
     return (
-        <div className={`video-card ${!videoOn ? 'video-card--off' : ''}`}>
+        <div className={`video-card ${!videoOn ? 'video-card--off' : ''} ${isScreenSharing ? 'video-card--screen-share' : ''} ${isPinned ? 'video-card--pinned' : ''}`}>
             <video
                 data-socket={socketId}
                 ref={videoRef}
@@ -55,7 +57,11 @@ const VideoTile = React.memo(({ stream, socketId, username, mediaState }) => {
                 </div>
             )}
             <div className="video-status-indicators">
-                <span className="video-name">{username}</span>
+                <span className="video-name">
+                    {username}
+                    {isScreenSharing && <span style={{ marginLeft: '8px', color: '#4ade80' }}>📺 Sharing Screen</span>}
+                    {isPinned && <span style={{ marginLeft: '8px', color: '#4ade80' }}>📌 Pinned</span>}
+                </span>
                 <div className="media-status-icons">
                     {!audioOn && (
                         <span className="status-icon muted" title="Microphone muted">

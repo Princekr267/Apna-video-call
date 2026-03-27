@@ -9,6 +9,10 @@ pnpm-lock.yaml
 .env.*.local
 .env.production
 
+node_modules/
+.env
+dist/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

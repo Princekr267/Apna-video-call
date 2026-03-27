@@ -16,6 +16,7 @@
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
     "axios": "^1.13.4",
+    "fabric": "^5.5.2",
     "http-status": "^2.1.0",
     "prop-types": "^15.8.1",
     "quill": "^2.0.3",

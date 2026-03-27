@@ -7,6 +7,8 @@ import VideocamOffIcon from '@mui/icons-material/VideocamOff';
 import StarIcon from '@mui/icons-material/Star';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import CloseIcon from '@mui/icons-material/Close';
+import PushPinIcon from '@mui/icons-material/PushPin';
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 
 export default function ParticipantsPanel({
     showUsersPanel,
@@ -23,7 +25,9 @@ export default function ParticipantsPanel({
     handleVideoOffUser,
     setShowTransferConfirm,
     setShowKickConfirm,
-    handleUsersToggle
+    handleUsersToggle,
+    handlePinUser,
+    pinnedSocketId
 }) {
     if (!showUsersPanel) return null;
 
@@ -69,6 +73,7 @@ export default function ParticipantsPanel({
                     const userMediaState = participantMediaState[user.socketId];
                     const isCurrentUser = user.socketId === socketIdRef.current;
                     const isUserHost = user.socketId === hostSocketId;
+                    const isPinned = user.socketId === pinnedSocketId;
                     const videoOn = isCurrentUser ? video : (userMediaState?.video === true);
                     const audioOn = isCurrentUser ? audio : (userMediaState?.audio === true);
 
@@ -91,6 +96,9 @@ export default function ParticipantsPanel({
                                     {isUserHost && !isCurrentUser && (
                                         <span className="hostLabel"> (Host)</span>
                                     )}
+                                    {isPinned && (
+                                        <span style={{ marginLeft: '8px', color: '#4ade80' }}>📌</span>
+                                    )}
                                 </span>
                                 <div className="user-media-status">
                                     {!audioOn && (
@@ -108,6 +116,22 @@ export default function ParticipantsPanel({
                                     )}
                                 </div>
                             </div>
+
+                            {/* Pin Button - available to everyone for non-self users */}
+                            {!isCurrentUser && (
+                                <IconButton
+                                    size="small"
+                                    onClick={() => handlePinUser(user.socketId)}
+                                    title={isPinned ? "Unpin participant" : "Pin participant"}
+                                    sx={{
+                                        color: isPinned ? '#4ade80' : 'rgba(255, 255, 255, 0.6)',
+                                        '&:hover': { color: isPinned ? '#22c55e' : '#4ade80' },
+                                        mr: 1
+                                    }}
+                                >
+                                    {isPinned ? <PushPinIcon sx={{ fontSize: '1rem' }} /> : <PushPinOutlinedIcon sx={{ fontSize: '1rem' }} />}
+                                </IconButton>
+                            )}
 
                             {/* Host Controls */}
                             {isHost && !isCurrentUser && (

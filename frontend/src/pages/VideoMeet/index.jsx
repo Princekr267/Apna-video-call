@@ -13,7 +13,7 @@ import ChatPanel from './components/ChatPanel';
 import ParticipantsPanel from './components/ParticipantsPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import ControlBar from './components/ControlBar';
-import CollabNotepad from '../components/CollabNotepad';
+import Whiteboard from '../components/Whiteboard';
 import servers from '../../enviroment';
 import ShareIcon from '@mui/icons-material/Share';
 import CheckIcon from '@mui/icons-material/Check';
@@ -60,7 +60,7 @@ export default function VideoMeetComponent() {
     // UI panels
     let [showModal,      setModal]      = useState(false);
     let [showUsersPanel, setShowUsersPanel] = useState(false);
-    let [showNotepad,    setShowNotepad]    = useState(false);
+    let [showWhiteboard,    setShowWhiteboard]    = useState(false);
 
     // Chat
     let [messages,    setMessages]    = useState([]);
@@ -97,6 +97,12 @@ export default function VideoMeetComponent() {
 
     // Remote video streams
     let [videos, setVideos] = useState([]);
+
+    // Screen sharing state
+    const [screenSharingSocketId, setScreenSharingSocketId] = useState(null);
+
+    // Pinned participant state
+    const [pinnedSocketId, setPinnedSocketId] = useState(null);
 
     // Share button state
     const [shareCopied, setShareCopied] = useState(false);
@@ -259,23 +265,56 @@ export default function VideoMeetComponent() {
         window.localStream = stream;
         localVideoRef.current.srcObject = stream;
 
+        // Replace tracks for all existing peers
         for (const id in connections) {
             if (id === socketIdRef.current) continue;
-            connections[id].addStream(stream);
-            connections[id].createOffer()
-                .then(desc => connections[id].setLocalDescription(desc))
-                .then(() => socketRef.current.emit('signal', id,
-                    JSON.stringify({ sdp: connections[id].localDescription })))
-                .catch(console.error);
+
+            const videoTrack = stream.getVideoTracks()[0];
+            const audioTrack = stream.getAudioTracks()[0];
+
+            // Get existing senders
+            const senders = connections[id].getSenders();
+            const videoSender = senders.find(s => s.track?.kind === 'video');
+            const audioSender = senders.find(s => s.track?.kind === 'audio');
+
+            // Replace or add video track
+            if (videoTrack) {
+                if (videoSender) {
+                    videoSender.replaceTrack(videoTrack).catch(console.error);
+                } else {
+                    connections[id].addTrack(videoTrack, stream);
+                }
+            }
+
+            // Replace or add audio track (screen share might have system audio)
+            if (audioTrack) {
+                if (audioSender) {
+                    audioSender.replaceTrack(audioTrack).catch(console.error);
+                } else {
+                    connections[id].addTrack(audioTrack, stream);
+                }
+            }
+
+            // If we added new tracks (no sender existed), we need to renegotiate
+            if ((!videoSender && videoTrack) || (!audioSender && audioTrack)) {
+                connections[id].createOffer()
+                    .then(desc => connections[id].setLocalDescription(desc))
+                    .then(() => socketRef.current.emit('signal', id,
+                        JSON.stringify({ sdp: connections[id].localDescription })))
+                    .catch(console.error);
+            }
         }
+
+        // Notify all users that this user is sharing screen
+        socketRef.current.emit('screen-share-started', { roomPath: window.location.href });
 
         stream.getTracks().forEach(track => {
             track.onended = () => {
                 setScreen(false);
+                socketRef.current.emit('screen-share-stopped', { roomPath: window.location.href });
                 try { localVideoRef.current.srcObject?.getTracks().forEach(t => t.stop()); } catch (_) {}
-                const blank = createBlankStream();
-                window.localStream = blank;
-                localVideoRef.current.srcObject = blank;
+
+                // Return to previous camera/audio state
                 getUserMedia();
             };
         });
@@ -622,6 +661,11 @@ export default function VideoMeetComponent() {
                     showNotification('You are now the host of this meeting', 'success');
                 }
             });
+
+            // ── Screen Sharing Events ────────────────────────────────────
+            socketRef.current.on('screen-share-update', ({ sharingSocketId, isSharing }) => {
+                setScreenSharingSocketId(isSharing ? sharingSocketId : null);
+            });
         });
     };
 
@@ -690,12 +734,23 @@ export default function VideoMeetComponent() {
         setShowTransferConfirm(null);
     };
 
+    // ── Pin Feature ─────────────────────────────────────────────────────────
+    const handlePinUser = (targetSocketId) => {
+        if (pinnedSocketId === targetSocketId) {
+            // Unpin if already pinned
+            setPinnedSocketId(null);
+        } else {
+            // Pin the selected user
+            setPinnedSocketId(targetSocketId);
+        }
+    };
+
     // ────────────────────────────────────────────────────────────────────────
 
     const handleChatToggle = () => {
         if (!showModal) {
             setShowUsersPanel(false);
-            setShowNotepad(false);
+            setShowWhiteboard(false);
             setNewMessages(0);
         }
         setModal(prev => !prev);
@@ -704,17 +759,17 @@ export default function VideoMeetComponent() {
     const handleUsersToggle = () => {
         if (!showUsersPanel) {
             setModal(false);
-            setShowNotepad(false);
+            setShowWhiteboard(false);
         }
         setShowUsersPanel(prev => !prev);
     };
 
-    const handleNotepadToggle = () => {
-        if (!showNotepad) {
+    const handleWhiteboardToggle = () => {
+        if (!showWhiteboard) {
             setModal(false);
             setShowUsersPanel(false);
         }
-        setShowNotepad(prev => !prev);
+        setShowWhiteboard(prev => !prev);
     };
 
     // ── Render ───────────────────────────────────────────────────────────────
@@ -772,16 +827,17 @@ export default function VideoMeetComponent() {
                 setShowTransferConfirm={setShowTransferConfirm}
                 setShowKickConfirm={setShowKickConfirm}
                 handleUsersToggle={handleUsersToggle}
+                handlePinUser={handlePinUser}
+                pinnedSocketId={pinnedSocketId}
             />
 
-            {showNotepad && (
-                <CollabNotepad
+            <div style={{ display: showWhiteboard ? 'block' : 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
+                <Whiteboard
                     roomId={window.location.pathname}
-                    userName={username}
-                    onClose={handleNotepadToggle}
+                    onClose={handleWhiteboardToggle}
                     socket={socketRef.current}
                 />
-            )}
+            </div>
 
             {/* ── Floating Share Button ─────────────────────────────────── */}
             <Tooltip title={shareCopied ? 'Link copied!' : 'Copy meeting link'} placement="right">
@@ -820,12 +876,12 @@ export default function VideoMeetComponent() {
                 connectedUsersLength={connectedUsers.length}
                 handleUsersToggle={handleUsersToggle}
                 showUsersPanel={showUsersPanel}
-                handleNotepadToggle={handleNotepadToggle}
-                showNotepad={showNotepad}
+                handleWhiteboardToggle={handleWhiteboardToggle}
+                showWhiteboard={showWhiteboard}
             />
 
             {/* ── Local Video PIP ──────────────────────────────────────── */}
-            <div className="localVideoWrapper">
+            <div className="localVideoWrapper" style={{ display: showWhiteboard ? 'none' : 'block' }}>
                 <video
                     ref={localVideoRef}
                     className="meetUserVideo"
@@ -843,15 +899,29 @@ export default function VideoMeetComponent() {
 
             {/* ── Remote Videos ────────────────────────────────────────── */}
             <div className="conferenceView">
-                {videos.map((v) => (
-                    <VideoTile
-                        key={v.socketId}
-                        stream={v.stream}
-                        socketId={v.socketId}
-                        username={connectedUsers.find(u => u.socketId === v.socketId)?.name || socketToUsername[v.socketId] || ''}
-                        mediaState={participantMediaState[v.socketId]}
-                    />
-                ))}
+                {videos
+                    .filter(v => {
+                        // If someone is pinned, only show that user's video
+                        if (pinnedSocketId) {
+                            return v.socketId === pinnedSocketId;
+                        }
+                        // If someone is sharing screen, only show that user's video
+                        if (screenSharingSocketId) {
+                            return v.socketId === screenSharingSocketId;
+                        }
+                        return true;
+                    })
+                    .map((v) => (
+                        <VideoTile
+                            key={v.socketId}
+                            stream={v.stream}
+                            socketId={v.socketId}
+                            username={connectedUsers.find(u => u.socketId === v.socketId)?.name || socketToUsername[v.socketId] || ''}
+                            mediaState={participantMediaState[v.socketId]}
+                            isScreenSharing={screenSharingSocketId === v.socketId}
+                            isPinned={pinnedSocketId === v.socketId}
+                        />
+                    ))}
             </div>
 
             {/* Flash Notification */}

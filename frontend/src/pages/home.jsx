@@ -65,6 +65,7 @@ function HomeComponent() {
         },
         '& .MuiInputLabel-root':             { color: 'var(--text-secondary)' },
         '& .MuiInputLabel-root.Mui-focused': { color: 'var(--accent-primary)' },
+        '& .MuiFormHelperText-root':         { color: '#ffffff' },
     };
 
     return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Badge from '@mui/material/Badge';
 import Menu from '@mui/material/Menu';
@@ -15,7 +15,7 @@ import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
 import ChatIcon from '@mui/icons-material/Chat';
 import PeopleIcon from '@mui/icons-material/People';
-import EditNoteIcon from '@mui/icons-material/EditNote';
+import BrushIcon from '@mui/icons-material/Brush';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 export default function ControlBar({
@@ -34,8 +34,8 @@ export default function ControlBar({
     connectedUsersLength,
     handleUsersToggle,
     showUsersPanel,
-    handleNotepadToggle,
-    showNotepad
+    handleWhiteboardToggle,
+    showWhiteboard
 }) {
     const [moreMenuAnchor, setMoreMenuAnchor] = useState(null);
     const moreMenuOpen = Boolean(moreMenuAnchor);
@@ -82,6 +82,51 @@ export default function ControlBar({
     const handleScreenToggle = () => {
         setScreen(s => !s);
     };
+
+    useEffect(() => {
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.setActionHandler('togglemicrophone', () => {
+                    setAudio(a => {
+                        const newState = !a;
+                        if (window.localStream) {
+                            window.localStream.getAudioTracks().forEach(track => {
+                                track.enabled = newState;
+                            });
+                        }
+                        if (socketRef.current) socketRef.current.emit('media-state-change', { video, audio: newState });
+                        return newState;
+                    });
+                });
+                navigator.mediaSession.setActionHandler('togglecamera', () => {
+                    setVideo(v => {
+                        const newState = !v;
+                        if (socketRef.current) socketRef.current.emit('media-state-change', { video: newState, audio });
+                        return newState;
+                    });
+                });
+                navigator.mediaSession.setActionHandler('hangup', () => {
+                    handleEndCall();
+                });
+                
+                // Keep the microphone/camera states in sync visually in the PiP bar
+                navigator.mediaSession.setMicrophoneActive(audio);
+                navigator.mediaSession.setCameraActive(video);
+
+                // Essential for some platforms to show controls
+                navigator.mediaSession.metadata = new window.MediaMetadata({
+                    title: 'Live Meeting',
+                    artist: 'MeetinVirtual',
+                    album: 'Room: ' + window.location.pathname.substring(1),
+                    artwork: [
+                        { src: '/vite.svg', sizes: '512x512', type: 'image/svg+xml' }
+                    ]
+                });
+            } catch (error) {
+                console.warn('MediaSession actions not supported:', error);
+            }
+        }
+    }, [audio, video, socketRef, handleEndCall, setAudio, setVideo]);
 
     return (
         <div className="buttonContainers">
@@ -140,13 +185,13 @@ export default function ControlBar({
                 </IconButton>
             </Badge>
 
-            {/* Desktop only: Notepad */}
+            {/* Desktop only: Whiteboard */}
             <IconButton
-                onClick={handleNotepadToggle}
-                className={`desktopOnly ${showNotepad ? 'activeIcon' : 'inactiveIcon'}`}
-                title="Collaborative Notepad"
+                onClick={handleWhiteboardToggle}
+                className={`desktopOnly ${showWhiteboard ? 'activeIcon' : 'inactiveIcon'}`}
+                title="Shared Whiteboard"
             >
-                <EditNoteIcon />
+                <BrushIcon />
             </IconButton>
 
             {/* Mobile only: More menu */}
@@ -198,11 +243,11 @@ export default function ControlBar({
 
                 <Divider sx={{ borderColor: 'var(--glass-border)' }} />
 
-                <MenuItem onClick={() => { handleNotepadToggle(); handleMoreClose(); }}>
-                    <ListItemIcon sx={{ color: showNotepad ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
-                        <EditNoteIcon />
+                <MenuItem onClick={() => { handleWhiteboardToggle(); handleMoreClose(); }}>
+                    <ListItemIcon sx={{ color: showWhiteboard ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
+                        <BrushIcon />
                     </ListItemIcon>
-                    <ListItemText>Collaborative Notepad</ListItemText>
+                    <ListItemText>Shared Whiteboard</ListItemText>
                 </MenuItem>
             </Menu>
         </div>

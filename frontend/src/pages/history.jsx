@@ -88,7 +88,7 @@ export default function History(){
                             </Box>
                     ))
                 ) : (
-                    <Typography variant="body1" color="text.secondary">
+                    <Typography variant="body1" style={{ color: "white" }}>
                         No meeting history found. Join a meeting to see it here!
                     </Typography>
                 )

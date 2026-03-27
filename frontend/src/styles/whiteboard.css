@@ -1,0 +1,206 @@
+.whiteboard-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  animation: slideInWhiteboard 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideInWhiteboard {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Float the header beautifully at the bottom like a modern iOS dock */
+.whiteboard-header {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 41, 59, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  box-shadow: 0 10px 40px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+  gap: 6px;
+  max-width: 95vw;
+}
+
+.whiteboard-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.whiteboard-color {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  background: transparent;
+  transition: transform 0.2s ease;
+}
+
+.whiteboard-color:hover {
+  transform: scale(1.1);
+}
+
+.whiteboard-color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.whiteboard-color::-webkit-color-swatch {
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+}
+
+.whiteboard-brush-size {
+  display: flex;
+  align-items: center;
+  margin: 0 10px;
+}
+
+.whiteboard-brush-size input[type=range] {
+  width: 80px;
+  accent-color: var(--accent-blue);
+  cursor: ew-resize;
+}
+
+.whiteboard-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+}
+
+.whiteboard-canvas-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #0f172a; /* Slightly darker shade than canvas for depth */
+  overflow: hidden;
+}
+
+/* FabricJS creates a .canvas-container wrapper we must scale */
+.canvas-container {
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.05);
+  max-width: 95% !important;
+  max-height: 90% !important;
+}
+
+.whiteboard-canvas {
+  touch-action: none;
+  border-radius: 8px;
+}
+
+/* ── Mobile Responsive Styles ───────────────────────────────────────── */
+
+@media screen and (max-width: 768px) {
+  .whiteboard-header {
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    transform: none;
+    padding: 8px 12px;
+    border-radius: 16px;
+    max-width: none;
+    width: auto;
+  }
+
+  .whiteboard-tools {
+    gap: 4px;
+  }
+
+  .whiteboard-tools .MuiIconButton-root {
+    padding: 6px;
+  }
+
+  .whiteboard-tools .MuiIconButton-root svg {
+    font-size: 1.2rem;
+  }
+
+  .whiteboard-color {
+    width: 28px;
+    height: 28px;
+  }
+
+  .whiteboard-brush-size {
+    margin: 0 4px;
+  }
+
+  .whiteboard-brush-size input[type=range] {
+    width: 50px;
+  }
+
+  .whiteboard-divider {
+    height: 20px;
+    margin: 0 2px;
+  }
+
+  .canvas-container {
+    max-width: 100% !important;
+    max-height: 85% !important;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .whiteboard-header {
+    bottom: 8px;
+    left: 5px;
+    right: 5px;
+    padding: 6px 8px;
+    border-radius: 12px;
+  }
+
+  .whiteboard-tools {
+    gap: 2px;
+  }
+
+  .whiteboard-tools .MuiIconButton-root {
+    padding: 4px;
+  }
+
+  .whiteboard-tools .MuiIconButton-root svg {
+    font-size: 1rem;
+  }
+
+  .whiteboard-color {
+    width: 24px;
+    height: 24px;
+  }
+
+  .whiteboard-brush-size {
+    margin: 0 2px;
+  }
+
+  .whiteboard-brush-size input[type=range] {
+    width: 40px;
+  }
+
+  .whiteboard-divider {
+    display: none;
+  }
+
+  .canvas-container {
+    max-width: 100% !important;
+    max-height: 80% !important;
+  }
+}
