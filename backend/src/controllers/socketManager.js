@@ -212,6 +212,28 @@ export const connectToSocket = (server) => {
             }
         });
 
+        // ── Emoji Reaction Events ────────────────────────────────────
+        socket.on("emoji-reaction", ({ emoji, shouldRotate }) => {
+            console.log('Backend received emoji-reaction:', { emoji, shouldRotate, socketId: socket.id });
+            
+            // Use socketToRoom to find the room quickly
+            const roomPath = socketToRoom[socket.id];
+            console.log('Room path:', roomPath);
+            
+            if (roomPath && connection[roomPath]) {
+                console.log('Broadcasting to room participants:', connection[roomPath]);
+                connection[roomPath].forEach((ele) => {
+                    io.to(ele).emit("emoji-reaction", {
+                        emoji,
+                        shouldRotate: shouldRotate !== undefined ? shouldRotate : true,
+                        senderSocketId: socket.id
+                    });
+                });
+            } else {
+                console.log('No room found for emoji emission, socketToRoom:', socketToRoom);
+            }
+        });
+
         // ── Host Features ─────────────────────────────────────────────────
 
         socket.on("host-force-mute-user", ({ targetSocketId, roomPath }) => {

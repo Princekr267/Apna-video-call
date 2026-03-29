@@ -38,3 +38,7 @@ tsc-out/
 
 # OS generated files
 Thumbs.db
+
+# Deprecated files
+backend/src/yjsServer.js
+

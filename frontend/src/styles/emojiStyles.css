@@ -1,0 +1,139 @@
+/* ────────────────────────────────────────────────────────────────────────── */
+/* ── Emoji Picker & Floating Emojis ───────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+/* Emoji Picker Wrapper with Scroll */
+.emoji-picker-wrapper {
+    max-height: 320px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+.emoji-picker-wrapper::-webkit-scrollbar {
+    width: 6px;
+}
+
+.emoji-picker-wrapper::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.2);
+    border-radius: 10px;
+}
+
+.emoji-picker-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(100,100,100,0.5);
+    border-radius: 10px;
+}
+
+.emoji-picker-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(150,150,150,0.7);
+}
+
+/* Emoji Picker Grid */
+.emoji-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    padding: 4px;
+}
+
+.emoji-button {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+}
+
+.emoji-button:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.15);
+    border-color: rgba(0, 136, 255, 0.5);
+    box-shadow: 0 4px 12px rgba(0, 136, 255, 0.3);
+}
+
+.emoji-button:active {
+    transform: scale(0.95);
+}
+
+/* Floating Emoji Container */
+.floating-emoji-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+}
+
+/* Individual Floating Emoji */
+.floating-emoji {
+    position: absolute;
+    bottom: 0;
+    font-size: 3rem;
+    user-select: none;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+    will-change: transform, opacity;
+}
+
+.floating-emoji.rotate {
+    animation: floatUpRotate linear forwards;
+}
+
+.floating-emoji.no-rotate {
+    animation: floatUpNoRotate linear forwards;
+}
+
+@keyframes floatUpRotate {
+    0% {
+        transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: translateY(-50vh) translateX(var(--drift)) rotate(180deg) scale(1.2);
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(-100vh) translateX(calc(var(--drift) * 1.5)) rotate(var(--rotate)) scale(0.5);
+        opacity: 0;
+    }
+}
+
+@keyframes floatUpNoRotate {
+    0% {
+        transform: translateY(0) translateX(0) scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: translateY(-50vh) translateX(var(--drift)) scale(1.2);
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(-100vh) translateX(calc(var(--drift) * 1.5)) scale(0.5);
+        opacity: 0;
+    }
+}
+
+/* Mobile responsive emojis */
+@media screen and (max-width: 600px) {
+    .floating-emoji {
+        font-size: 2.5rem;
+    }
+    
+    .emoji-picker-grid {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+    }
+    
+    .emoji-button {
+        width: 40px;
+        height: 40px;
+        font-size: 1.3rem;
+    }
+}

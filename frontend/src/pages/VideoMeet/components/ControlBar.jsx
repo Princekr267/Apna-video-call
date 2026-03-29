@@ -17,6 +17,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import PeopleIcon from '@mui/icons-material/People';
 import BrushIcon from '@mui/icons-material/Brush';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EmojiPicker from './EmojiPicker';
 
 export default function ControlBar({
     video,
@@ -35,7 +36,8 @@ export default function ControlBar({
     handleUsersToggle,
     showUsersPanel,
     handleWhiteboardToggle,
-    showWhiteboard
+    showWhiteboard,
+    onEmojiSelect
 }) {
     const [moreMenuAnchor, setMoreMenuAnchor] = useState(null);
     const moreMenuOpen = Boolean(moreMenuAnchor);
@@ -193,6 +195,9 @@ export default function ControlBar({
             >
                 <BrushIcon />
             </IconButton>
+
+            {/* Always visible: Emoji Reactions */}
+            <EmojiPicker onEmojiSelect={onEmojiSelect} />
 
             {/* Mobile only: More menu */}
             <IconButton

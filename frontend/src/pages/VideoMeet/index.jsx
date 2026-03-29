@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/videoComponent.css";
+import "../../styles/emojiStyles.css";
 import io from 'socket.io-client';
 import { GoogleGenAI } from "@google/genai";
 import { AuthContext } from '../../context/AuthContext';
@@ -14,6 +15,7 @@ import ParticipantsPanel from './components/ParticipantsPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import ControlBar from './components/ControlBar';
 import Whiteboard from '../components/Whiteboard';
+import FloatingEmoji from './components/FloatingEmoji';
 import servers from '../../enviroment';
 import ShareIcon from '@mui/icons-material/Share';
 import CheckIcon from '@mui/icons-material/Check';
@@ -42,6 +44,7 @@ export default function VideoMeetComponent() {
     const videoListRef    = useRef([]);
     const messagesEndRef  = useRef();
     const fileInputRef    = useRef();
+    const addFloatingEmojiRef = useRef();
 
     // Device availability
     let [videoAvailable, setVideoAvailable] = useState(true);
@@ -107,6 +110,9 @@ export default function VideoMeetComponent() {
     // Share button state
     const [shareCopied, setShareCopied] = useState(false);
 
+    // Floating emojis state
+    const [floatingEmojis, setFloatingEmojis] = useState([]);
+
     const handleShare = async () => {
         const shareUrl = window.location.href;
         try {
@@ -121,6 +127,35 @@ export default function VideoMeetComponent() {
         }
         setShareCopied(true);
         setTimeout(() => setShareCopied(false), 2000);
+    };
+
+    // ── Emoji reactions ─────────────────────────────────────────────────────
+    const handleEmojiSelect = (emoji, shouldRotate) => {
+        console.log('Emoji selected:', emoji, 'shouldRotate:', shouldRotate);
+        
+        // Add to local state immediately for responsiveness
+        addFloatingEmoji(emoji, shouldRotate);
+        
+        // Emit emoji to all users
+        if (socketRef.current && socketRef.current.connected) {
+            console.log('Emitting emoji-reaction to server');
+            socketRef.current.emit('emoji-reaction', { emoji, shouldRotate });
+        } else {
+            console.error('Socket not connected!', socketRef.current);
+        }
+    };
+
+    const addFloatingEmoji = (emoji, shouldRotate = true) => {
+        const id = Date.now() + Math.random();
+        console.log('Adding floating emoji:', { id, emoji, shouldRotate });
+        setFloatingEmojis(prev => [...prev, { id, emoji, shouldRotate }]);
+    };
+    
+    // Keep the ref updated so socket listeners always have fresh function
+    addFloatingEmojiRef.current = addFloatingEmoji;
+
+    const removeFloatingEmoji = (id) => {
+        setFloatingEmojis(prev => prev.filter(e => e.id !== id));
     };
 
     // ── Permissions & initial stream ────────────────────────────────────────
@@ -277,6 +312,21 @@ export default function VideoMeetComponent() {
             const blank = createBlankStream();
             window.localStream = blank;
             localVideoRef.current.srcObject = blank;
+            
+            // Replace tracks for all existing peers with blank stream
+            for (const id in connections) {
+                if (id === socketIdRef.current) continue;
+                const senders = connections[id].getSenders();
+                const videoSender = senders.find(s => s.track?.kind === 'video');
+                const audioSender = senders.find(s => s.track?.kind === 'audio');
+                
+                if (videoSender && blank.getVideoTracks()[0]) {
+                    videoSender.replaceTrack(blank.getVideoTracks()[0]).catch(console.error);
+                }
+                if (audioSender && blank.getAudioTracks()[0]) {
+                    audioSender.replaceTrack(blank.getAudioTracks()[0]).catch(console.error);
+                }
+            }
         }
     };
 
@@ -307,32 +357,69 @@ export default function VideoMeetComponent() {
             if (id === socketIdRef.current) continue;
 
             const senders = connections[id].getSenders();
-            const videoSender = senders.find(s => s.track?.kind === 'video' || (s.track === null && s.replaceTrack));
+            // Find any video sender (could have track or null track)
+            const videoSender = senders.find(s => 
+                s.track?.kind === 'video' || 
+                (s.track === null) ||
+                // Check if sender was added for video by checking transceiver mid
+                (connections[id].getTransceivers?.()?.find(t => t.sender === s && t.receiver?.track?.kind === 'video'))
+            );
             const audioSender = senders.find(s => s.track?.kind === 'audio');
 
-            // Replace video track
-            if (videoTrack && videoSender) {
-                videoSender.replaceTrack(videoTrack).catch(console.error);
-            } else if (videoTrack) {
-                // No existing video sender, need to add track and renegotiate
-                try {
-                    connections[id].addTrack(videoTrack, stream);
-                } catch (e) {
-                    console.error('Error adding video track:', e);
+            // Handle video track - replace if sender exists, otherwise add new track
+            if (videoTrack) {
+                if (videoSender) {
+                    // Replace existing video track
+                    videoSender.replaceTrack(videoTrack)
+                        .then(() => {
+                            // Renegotiate after successful replace
+                            connections[id].createOffer()
+                                .then(desc => connections[id].setLocalDescription(desc))
+                                .then(() => socketRef.current.emit('signal', id,
+                                    JSON.stringify({ sdp: connections[id].localDescription })))
+                                .catch(console.error);
+                        })
+                        .catch(err => {
+                            console.error('Error replacing video track:', err);
+                            // Fallback: try adding track if replace fails
+                            try {
+                                connections[id].addTrack(videoTrack, stream);
+                                // Renegotiate after adding track
+                                connections[id].createOffer()
+                                    .then(desc => connections[id].setLocalDescription(desc))
+                                    .then(() => socketRef.current.emit('signal', id,
+                                        JSON.stringify({ sdp: connections[id].localDescription })))
+                                    .catch(console.error);
+                            } catch (e) {
+                                console.error('Error adding video track as fallback:', e);
+                            }
+                        });
+                } else {
+                    // No video sender exists, add the track
+                    try {
+                        connections[id].addTrack(videoTrack, stream);
+                        // Renegotiate after adding track
+                        connections[id].createOffer()
+                            .then(desc => connections[id].setLocalDescription(desc))
+                            .then(() => socketRef.current.emit('signal', id,
+                                JSON.stringify({ sdp: connections[id].localDescription })))
+                            .catch(console.error);
+                    } catch (e) {
+                        console.error('Error adding video track:', e);
+                    }
                 }
             }
 
-            // Replace audio track if screen share has audio
+            // Replace audio track if screen share has audio (don't renegotiate again)
             if (audioTrack && audioSender) {
                 audioSender.replaceTrack(audioTrack).catch(console.error);
+            } else if (audioTrack && !audioSender) {
+                try {
+                    connections[id].addTrack(audioTrack, stream);
+                } catch (e) {
+                    console.error('Error adding audio track:', e);
+                }
             }
-
-            // Renegotiate to ensure remote side receives the new stream
-            connections[id].createOffer()
-                .then(desc => connections[id].setLocalDescription(desc))
-                .then(() => socketRef.current.emit('signal', id,
-                    JSON.stringify({ sdp: connections[id].localDescription })))
-                .catch(console.error);
         }
 
         // Notify all users that this user is sharing screen
@@ -674,13 +761,16 @@ export default function VideoMeetComponent() {
                         }
                     };
 
-                    // Use ontrack instead of deprecated onaddstream for better track handling
+                    // Use ontrack for track handling
+                    // Note: ontrack fires once per track (video + audio), so we check if entry exists
                     connections[peerId].ontrack = (event) => {
                         const stream = event.streams[0];
                         if (!stream) return;
                         
+                        // Check using the ref to get latest state (avoids stale closure)
                         const exists = videoListRef.current.find(v => v.socketId === peerId);
                         if (exists) {
+                            // Update existing entry with potentially new stream
                             setVideos(prev => {
                                 const updated = prev.map(v =>
                                     v.socketId === peerId ? { ...v, stream: stream } : v);
@@ -688,27 +778,13 @@ export default function VideoMeetComponent() {
                                 return updated;
                             });
                         } else {
+                            // Add new entry only if it doesn't exist
                             setVideos(prev => {
+                                // Double-check in prev state to avoid race condition
+                                if (prev.find(v => v.socketId === peerId)) {
+                                    return prev;
+                                }
                                 const updated = [...prev, { socketId: peerId, stream: stream }];
-                                videoListRef.current = updated;
-                                return updated;
-                            });
-                        }
-                    };
-
-                    // Also keep onaddstream for backward compatibility
-                    connections[peerId].onaddstream = (event) => {
-                        const exists = videoListRef.current.find(v => v.socketId === peerId);
-                        if (exists) {
-                            setVideos(prev => {
-                                const updated = prev.map(v =>
-                                    v.socketId === peerId ? { ...v, stream: event.stream } : v);
-                                videoListRef.current = updated;
-                                return updated;
-                            });
-                        } else {
-                            setVideos(prev => {
-                                const updated = [...prev, { socketId: peerId, stream: event.stream }];
                                 videoListRef.current = updated;
                                 return updated;
                             });
@@ -806,6 +882,21 @@ export default function VideoMeetComponent() {
             // ── Screen Sharing Events ────────────────────────────────────
             socketRef.current.on('screen-share-update', ({ sharingSocketId, isSharing }) => {
                 setScreenSharingSocketId(isSharing ? sharingSocketId : null);
+            });
+
+            // ── Emoji Reaction Events ────────────────────────────────────────
+            socketRef.current.on('emoji-reaction', ({ emoji, shouldRotate, senderSocketId }) => {
+                console.log('Received emoji-reaction:', { emoji, shouldRotate, senderSocketId, mySocketId: socketIdRef.current });
+                // Don't show our own emoji again (we already showed it locally)
+                if (senderSocketId !== socketIdRef.current) {
+                    console.log('Adding emoji from other user');
+                    // Use the ref to avoid stale closure issues
+                    if (addFloatingEmojiRef.current) {
+                        addFloatingEmojiRef.current(emoji, shouldRotate);
+                    }
+                } else {
+                    console.log('Ignoring own emoji (already shown locally)');
+                }
             });
         });
     };
@@ -1019,7 +1110,11 @@ export default function VideoMeetComponent() {
                 showUsersPanel={showUsersPanel}
                 handleWhiteboardToggle={handleWhiteboardToggle}
                 showWhiteboard={showWhiteboard}
+                onEmojiSelect={handleEmojiSelect}
             />
+
+            {/* ── Floating Emojis ─────────────────────────────────────────── */}
+            <FloatingEmoji emojis={floatingEmojis} onComplete={removeFloatingEmoji} />
 
             {/* ── Local Video PIP ──────────────────────────────────────── */}
             <div className="localVideoWrapper" style={{ display: showWhiteboard ? 'none' : 'block' }}>
