@@ -1,5 +1,5 @@
 import {Router} from "express";
-import { addToHistory, getUserHistory, login, register, getProfile } from "../controllers/user.controller.js";
+import { addToHistory, getUserHistory, login, register, getProfile, authenticateToken } from "../controllers/user.controller.js";
 import passport from "../config/passport.js";
 import { sendResetOtp, verifyResetOtp, resetPassword } from "../controllers/user.controller.js";
 
@@ -8,9 +8,12 @@ const router = Router();
 
 router.route("/login").post(login);
 router.route("/register").post(register);
-router.route("/add_to_activity").post(addToHistory);
-router.route("/get_all_activity").get(getUserHistory);
-router.route("/profile").get(getProfile);
+
+// Protected routes - require authentication
+router.route("/add_to_activity").post(authenticateToken, addToHistory);
+router.route("/get_all_activity").get(authenticateToken, getUserHistory);
+router.route("/profile").get(authenticateToken, getProfile);
+
 router.route("/forgot-password/send-otp").post(sendResetOtp);
 router.route("/forgot-password/verify-otp").post(verifyResetOtp);
 router.route("/forgot-password/reset").post(resetPassword);

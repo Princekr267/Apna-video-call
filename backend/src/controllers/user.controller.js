@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { Meeting } from "../models/meeting.model.js"
 import { sendOtpEmail } from "../utils/mailer.js";
+import { generateAccessToken, authenticateToken } from "../utils/auth.middleware.js";
 
 // Step 1 — Send OTP
 export const sendResetOtp = async (req, res) => {
@@ -144,9 +145,10 @@ const login = async (req, res) => {
         if (!isPasswordCorrect) {
             return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid email or password." });
         }
-        const token = crypto.randomBytes(20).toString("hex");
-        user.token = token;
-        await user.save();
+        
+        // Generate JWT token
+        const token = generateAccessToken(user._id.toString(), user.username);
+        
         return res.status(httpStatus.OK).json({ token });
     } catch (e) {
         return res.status(500).json({ message: "Something went wrong." });
@@ -184,9 +186,12 @@ const register = async (req, res) => {
 };
 
 const getUserHistory = async (req, res) => {
-    const {token} = req.query;
     try{
-        const user = await User.findOne({token: token});
+        // User info is in req.user from authenticateToken middleware
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
+        }
         const meetings = await Meeting.find({user_id: user.username});
         res.json(meetings)
     } catch (e) {
@@ -195,18 +200,21 @@ const getUserHistory = async (req, res) => {
 }
 
 const addToHistory = async (req, res) => {
-    const { token, meetingCode } = req.body;
+    const { meetingCode } = req.body;
 
-    if (!token || !meetingCode) {
-        return res.status(400).json({ message: "Token and meeting code are required." });
+    if (!meetingCode) {
+        return res.status(400).json({ message: "Meeting code is required." });
     }
     if (!MEETING_CODE_REGEX.test(meetingCode)) {
         return res.status(400).json({ message: "Invalid meeting code format." });
     }
 
     try {
-        const user = await User.findOne({ token });
-        if (!user) return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid session." });
+        // User info is in req.user from authenticateToken middleware
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
+        }
 
         const newMeeting = new Meeting({ user_id: user.username, meetingCode });
         await newMeeting.save();
@@ -217,9 +225,9 @@ const addToHistory = async (req, res) => {
 };
 
 const getProfile = async (req, res) => {
-    const { token } = req.query;
     try {
-        const user = await User.findOne({ token });
+        // User info is in req.user from authenticateToken middleware
+        const user = await User.findById(req.user.userId);
         if (!user) {
             return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
         }
@@ -229,4 +237,4 @@ const getProfile = async (req, res) => {
     }
 };
 
-export {login, register, getUserHistory, addToHistory, getProfile};
+export {login, register, getUserHistory, addToHistory, getProfile, authenticateToken};

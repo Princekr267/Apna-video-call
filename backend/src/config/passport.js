@@ -1,6 +1,7 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { User } from "../models/user.model.js";
+import { generateAccessToken } from "../utils/auth.middleware.js";
 import crypto from "crypto";
 
 // Build callback URL - use BACKEND_URL for production, relative for dev
@@ -35,11 +36,10 @@ passport.use(new GoogleStrategy({
         }
       }
 
-      const token = crypto.randomBytes(20).toString("hex");
-      user.token = token;
-      await user.save();
+      // Generate JWT token instead of random string
+      const token = generateAccessToken(user._id.toString(), user.username);
 
-      return done(null, { token });
+      return done(null, { token, userId: user._id, username: user.username });
     } catch (err) {
       return done(err, null);
     }

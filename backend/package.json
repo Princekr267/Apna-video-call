@@ -23,6 +23,8 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "http-status": "^2.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "lib0": "^0.2.117",
     "mongoose": "^9.1.5",
     "nodemailer": "^8.0.3",
     "nodemon": "^3.1.11",

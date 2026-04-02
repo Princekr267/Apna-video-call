@@ -992,16 +992,18 @@
   .chatRoom, .usersPanel {
     width: 90vw;
     right: 5vw;
-    height: 60vh;
+    height: calc(100vh - 180px); /* Account for control bar and safe area */
+    max-height: 60vh;
     top: auto;
     bottom: 110px;
   }
   .chattingArea {
-    left: 15px;
-    right: 15px;
-    bottom: 20px;
+    left: 5vw;
+    right: 5vw;
+    bottom: max(20px, env(safe-area-inset-bottom, 20px)); /* Account for notch/home indicator */
     padding: 6px 8px;
     gap: 6px;
+    max-width: 90vw;
   }
   .chattingArea button {
     width: 44px;
@@ -1015,6 +1017,7 @@
   .chattingArea input {
     padding: 8px 6px;
     font-size: 0.85rem;
+    max-width: 100%;
   }
   .chattingArea input::placeholder {
     font-size: 0.8rem;
@@ -1032,6 +1035,24 @@
   }
   .localVideoAvatar span {
       font-size: 2.5rem;
+  }
+}
+
+/* Extra small mobile devices - additional safety */
+@media screen and (max-width: 480px) {
+  .chatRoom {
+    height: calc(100vh - 200px);
+    max-height: 55vh;
+  }
+  .chattingArea {
+    left: 10px;
+    right: 10px;
+    bottom: max(15px, env(safe-area-inset-bottom, 15px));
+    padding: 5px 6px;
+  }
+  .chattingArea input {
+    font-size: 0.8rem;
+    padding: 6px 4px;
   }
 }
 

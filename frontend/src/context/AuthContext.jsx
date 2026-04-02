@@ -11,6 +11,33 @@ const client = axios.create({
     withCredentials: true
 });
 
+// Add request interceptor to include token in headers
+client.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
+// Add response interceptor to handle token expiration
+client.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401 && error.response?.data?.expired) {
+            // Token expired - clear storage and redirect to login
+            localStorage.removeItem('token');
+            window.location.href = '/auth';
+        }
+        return Promise.reject(error);
+    }
+);
+
 export const AuthProvider = ({children}) => {
     const authContext = useContext(AuthContext);
 
@@ -50,11 +77,8 @@ export const AuthProvider = ({children}) => {
 
     const getHistoryOfUser = async() => {
         try{
-            let request = await client.get("/get_all_activity", {
-                params: {
-                    token: localStorage.getItem("token")
-                }
-            });
+            // Token is automatically added via interceptor
+            let request = await client.get("/get_all_activity");
             return request.data;
         } catch (err){
             throw err;
@@ -63,8 +87,8 @@ export const AuthProvider = ({children}) => {
 
     const addToUserHistory = async(meetingCode) => {
         try { 
+            // Token is automatically added via interceptor
             let request = await client.post("/add_to_activity", {
-                token: localStorage.getItem("token"),
                 meetingCode: meetingCode
             });
             return request
@@ -76,9 +100,8 @@ export const AuthProvider = ({children}) => {
 
     const getUserProfile = async () => {
         try {
-            let request = await client.get("/profile", {
-                params: { token: localStorage.getItem("token") }
-            });
+            // Token is automatically added via interceptor
+            let request = await client.get("/profile");
             return request.data;
         } catch (err) {
             throw err;

@@ -35,14 +35,25 @@
   box-shadow: 0 10px 40px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
   gap: 6px;
   max-width: 95vw;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+/* Hide scrollbar for Chrome/Safari/Opera */
+.whiteboard-header::-webkit-scrollbar {
+  display: none;
 }
 
 .whiteboard-tools {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* Don't wrap on mobile - scroll instead */
   justify-content: center;
+  min-width: min-content;
 }
 
 .whiteboard-color {
@@ -116,21 +127,25 @@
 @media screen and (max-width: 768px) {
   .whiteboard-header {
     bottom: 10px;
-    left: 10px;
-    right: 10px;
+    left: 5px;
+    right: 5px;
     transform: none;
     padding: 8px 12px;
     border-radius: 16px;
     max-width: none;
     width: auto;
+    justify-content: flex-start;
   }
 
   .whiteboard-tools {
-    gap: 4px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
   }
 
   .whiteboard-tools .MuiIconButton-root {
     padding: 6px;
+    flex-shrink: 0;
   }
 
   .whiteboard-tools .MuiIconButton-root svg {
@@ -140,19 +155,22 @@
   .whiteboard-color {
     width: 28px;
     height: 28px;
+    flex-shrink: 0;
   }
 
   .whiteboard-brush-size {
     margin: 0 4px;
+    flex-shrink: 0;
   }
 
   .whiteboard-brush-size input[type=range] {
-    width: 50px;
+    width: 60px;
   }
 
   .whiteboard-divider {
     height: 20px;
-    margin: 0 2px;
+    margin: 0 4px;
+    flex-shrink: 0;
   }
 
   .canvas-container {
@@ -171,11 +189,11 @@
   }
 
   .whiteboard-tools {
-    gap: 2px;
+    gap: 4px;
   }
 
   .whiteboard-tools .MuiIconButton-root {
-    padding: 4px;
+    padding: 5px;
   }
 
   .whiteboard-tools .MuiIconButton-root svg {
@@ -183,8 +201,8 @@
   }
 
   .whiteboard-color {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
   }
 
   .whiteboard-brush-size {
@@ -192,11 +210,12 @@
   }
 
   .whiteboard-brush-size input[type=range] {
-    width: 40px;
+    width: 50px;
   }
 
   .whiteboard-divider {
-    display: none;
+    height: 18px;
+    margin: 0 2px;
   }
 
   .canvas-container {
